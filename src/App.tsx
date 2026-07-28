@@ -1,13 +1,182 @@
-function App() {
-  return (
-    <>
-      <div className="flex min-h-screen items-center justify-center bg-black">
-        <h1 className="text-3xl font-bold text-blue-600 underline">
-          Tailwind is Working!
-        </h1>
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import React, { useState, useEffect } from 'react';
+import { LoginPage } from './features/auth/LoginPage';
+import { Sidebar } from './features/layout/Sidebar';
+import { Dashboard } from './features/dashboard/Dashboard.tsx';
+import { EmployeeManager } from './features/hr/EmployeeManager.tsx';
+import { AISearch } from './features/hr/AISerach.tsx';
+import { Reports } from './features/hr/Reports';
+import { PayrollRecords } from './features/hr/PayrollRecords';
+import { LeaveRecords } from './features/hr/LeaveRecords';
+import { AttendanceRecords } from './features/hr/AttendanceRecords';
+import { TalentAcquisition } from './features/hr/TalentAcquisition';
+import { FeedbackInbox } from './features/hr/FeedbackInbox.tsx';
+import { FeedbackModal } from './assets/common/FeedbackModal.tsx';
+import { AdminDashboard } from './features/admin/AdminDashboard';
+import { storageService } from './services/storageService.ts';
+import { Logo } from './assets/common/Logo';
+import { type User, type Employee, Role } from './types/types.ts';
+import { motion, AnimatePresence } from 'motion/react';
+import { MessageSquare } from 'lucide-react';
+
+export default function App() {
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [activeView, setActiveView] = useState<string>('dashboard');
+  const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
+  const [isInitialized, setIsInitialized] = useState(false);
+  const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false);
+
+  useEffect(() => {
+    storageService.initData();
+    const user = storageService.getCurrentUser();
+    if (user) {
+      setCurrentUser(user);
+      setActiveView('dashboard');
+    }
+    setIsInitialized(true);
+  }, []);
+
+  const handleLogout = () => {
+    storageService.setCurrentUser(null);
+    setCurrentUser(null);
+    setActiveView('dashboard');
+  };
+
+  const handleLoginSuccess = (user: User) => {
+    setCurrentUser(user);
+    setActiveView('dashboard');
+  };
+
+  if (!isInitialized) return null;
+
+  if (!currentUser) {
+    return <LoginPage onLoginSuccess={handleLoginSuccess} />;
+  }
+
+  const Unauthorized = () => (
+    <div className="flex flex-col items-center justify-center min-h-[50vh] text-center p-8 bg-white border border-red-100 rounded-[30px] shadow-sm max-w-xl mx-auto my-12 animate-in fade-in duration-300">
+      <div className="h-16 w-16 rounded-3xl bg-red-50 text-red-650 flex items-center justify-center mb-6 border border-red-100/50">
+        <span className="text-2xl">⚠️</span>
       </div>
-    </>
+      <h3 className="text-xl font-black text-green-950 uppercase tracking-tight">Access Rule Limitation</h3>
+      <p className="text-xs text-gray-400 font-bold uppercase mt-1 tracking-widest animate-pulse">NMC-HR Security Layer</p>
+      <p className="text-xs text-gray-500 font-semibold leading-relaxed mt-4 max-w-sm">
+        Your account access rules limit you from viewing this sub-system. Please reach out to an Administrator to adjust your allowed access features.
+      </p>
+    </div>
+  );
+
+  const renderContent = () => {
+    // Check permissions
+    if (currentUser.role !== Role.ADMIN) {
+      const p = currentUser.permissions;
+      if (p) {
+        if (activeView === 'employees' && p.employees === false) return <Unauthorized />;
+        if (activeView === 'ai-search' && p.aiSearch === false) return <Unauthorized />;
+        if ((activeView === 'reports' || activeView === 'employment-report' || activeView === 'promotion-report') && p.reports === false) return <Unauthorized />;
+        if (activeView === 'payroll' && p.payroll === false) return <Unauthorized />;
+        if (activeView === 'leaves' && p.leaves === false) return <Unauthorized />;
+        if (activeView === 'attendance' && p.attendance === false) return <Unauthorized />;
+        if (activeView === 'talent-acquisition' && p.talentAcquisition === false) return <Unauthorized />;
+        if (activeView === 'administration') return <Unauthorized />;
+      }
+    }
+
+    switch (activeView) {
+      // HR Views
+      case 'dashboard':
+        return <Dashboard user={currentUser} setActiveView={setActiveView} setSelectedEmployee={setSelectedEmployee} />;
+      case 'employees':
+        return <EmployeeManager />;
+      case 'add-employee':
+        return <EmployeeManager />; // Fallback for any remaining links
+      case 'ai-search':
+        return <AISearch />;
+      case 'reports':
+        return <Reports />;
+      case 'employment-report':
+        return <Reports initialType="Employment Report" />;
+      case 'promotion-report':
+        return <Reports initialType="Promotion Report" />;
+      case 'payroll':
+        return <PayrollRecords />;
+      case 'leaves':
+        return <LeaveRecords />;
+      case 'attendance':
+        return <AttendanceRecords />;
+      case 'talent-acquisition':
+        return <TalentAcquisition />;
+      case 'feedback':
+        return <FeedbackInbox />;
+      
+      // Admin Views
+      case 'administration':
+        return <AdminDashboard />;
+      
+      default:
+        return <Dashboard user={currentUser} setActiveView={setActiveView} setSelectedEmployee={setSelectedEmployee} />;
+    }
+  };
+
+  const isEmployeeAccount = !!currentUser?.employeeId || currentUser?.role === Role.EMPLOYEE;
+
+  return (
+    <div className="flex min-h-screen bg-[#fdfcf0] text-green-950 font-sans selection:bg-yellow-200 selection:text-green-900">
+      <Sidebar 
+        user={currentUser} 
+        activeView={activeView} 
+        setActiveView={setActiveView} 
+        onLogout={handleLogout} 
+      />
+      
+      <main className="flex-1 overflow-x-hidden">
+        <div className="max-w-[1400px] xl:max-w-[1600px] 2xl:max-w-[1800px] mx-auto pt-20 px-4 pb-6 lg:p-10">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={activeView}
+              initial={{ opacity: 0, x: 10 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -10 }}
+              transition={{ duration: 0.3, ease: "easeOut" }}
+            >
+              {renderContent()}
+            </motion.div>
+          </AnimatePresence>
+        </div>
+      </main>
+
+      {/* Floating Feedback Trigger Button ONLY for Employee Accounts (like Juan Dela Cruz) */}
+      {isEmployeeAccount && (
+        <button
+          onClick={() => setIsFeedbackModalOpen(true)}
+          className="fixed bottom-6 right-6 z-40 flex items-center gap-2.5 px-4 py-3 bg-yellow-400 hover:bg-yellow-300 text-green-950 font-black text-xs uppercase tracking-wider rounded-2xl shadow-xl hover:shadow-2xl hover:scale-105 active:scale-95 transition-all border-2 border-green-900 cursor-pointer"
+          title="Send feedback or inquiries to HR"
+        >
+          <MessageSquare size={16} className="text-green-900" />
+          <span className="hidden sm:inline">Send Feedback</span>
+        </button>
+      )}
+
+      {/* Global Feedback Modal */}
+      <FeedbackModal
+        isOpen={isFeedbackModalOpen}
+        onClose={() => setIsFeedbackModalOpen(false)}
+      />
+      
+      {/* Footer Branding */}
+      <footer className="fixed bottom-4 right-28 pointer-events-none opacity-20 hidden lg:block">
+        <div className="flex items-center gap-3 justify-end">
+          <Logo className="w-8 h-8" />
+          <div className="text-right">
+            <p className="text-4xl font-black text-green-900 tracking-tighter leading-none">NMC-HR</p>
+            <p className="text-[10px] font-bold text-green-700 uppercase tracking-widest mt-1">Enterprise Core v1.0</p>
+          </div>
+        </div>
+      </footer>
+    </div>
   );
 }
-
-export default App;
