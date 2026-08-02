@@ -1,10 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Sparkles, Send, Bot, User, Loader2, Info } from 'lucide-react';
-import { aiService } from '../../services/aiService';
-import { storageService } from '../../services/storageService';
+import { Sparkles, Send, Bot, User, Info } from 'lucide-react';
 import { Logo } from '../../assets/common/Logo.tsx';
 import { motion, AnimatePresence } from 'motion/react';
 import ReactMarkdown from 'react-markdown';
+
+const AI_SEARCH_UNAVAILABLE_MESSAGE =
+  'AI Search is temporarily unavailable. An API key has not been configured yet. This feature will be enabled once Gemini credentials are set up.';
 
 interface Message {
   id: string;
@@ -16,8 +17,8 @@ interface Message {
 export const AISearch: React.FC = () => {
   const [query, setQuery] = useState('');
   const [messages, setMessages] = useState<Message[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const isAiSearchEnabled = false;
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -25,32 +26,18 @@ export const AISearch: React.FC = () => {
     }
   }, [messages]);
 
-  const handleSend = async () => {
-    if (!query.trim() || isLoading) return;
+  const handleSend = () => {
+    if (!query.trim() || !isAiSearchEnabled) return;
 
     const userMessage: Message = {
       id: Date.now().toString(),
       role: 'user',
       content: query,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     };
 
-    setMessages(prev => [...prev, userMessage]);
+    setMessages((prev) => [...prev, userMessage]);
     setQuery('');
-    setIsLoading(true);
-
-    const employees = storageService.getEmployees();
-    const result = await aiService.queryEmployees(query, employees);
-
-    const assistantMessage: Message = {
-      id: (Date.now() + 1).toString(),
-      role: 'assistant',
-      content: result,
-      timestamp: Date.now()
-    };
-
-    setMessages(prev => [...prev, assistantMessage]);
-    setIsLoading(false);
   };
 
    const suggestions = [
@@ -74,6 +61,10 @@ export const AISearch: React.FC = () => {
       </header>
 
       <div className="flex-1 bg-white rounded-3xl border border-gray-100 shadow-xl overflow-hidden flex flex-col">
+        <div className="mx-6 mt-6 rounded-2xl border border-yellow-200 bg-yellow-50 px-4 py-3 text-sm font-semibold text-green-900">
+          {AI_SEARCH_UNAVAILABLE_MESSAGE}
+        </div>
+
         {/* Chat Area */}
         <div ref={scrollRef} className="flex-1 overflow-y-auto p-6 space-y-6">
           {messages.length === 0 && (
@@ -81,15 +72,18 @@ export const AISearch: React.FC = () => {
               <div className="w-20 h-20 bg-yellow-50 rounded-full flex items-center justify-center mb-6">
                 <Bot className="text-yellow-600" size={40} />
               </div>
-              <h3 className="text-xl font-bold text-green-950 mb-2">Hello! How can I assist you today?</h3>
-              <p className="text-gray-500 text-sm mb-8 font-medium">Ask me anything about your employee records using natural language.</p>
+              <h3 className="text-xl font-bold text-green-950 mb-2">AI Search is coming soon</h3>
+              <p className="text-gray-500 text-sm mb-8 font-medium">
+                This assistant will be available after the Gemini API key is configured.
+              </p>
               
-              <div className="w-full space-y-2">
+              <div className="w-full space-y-2 opacity-60">
                 {suggestions.map((s, i) => (
                   <button 
                     key={i}
-                    onClick={() => setQuery(s)}
-                    className="w-full p-3 text-sm font-semibold text-green-800 bg-green-50/50 hover:bg-green-100 rounded-xl transition-all text-left flex items-center gap-2"
+                    type="button"
+                    disabled
+                    className="w-full p-3 text-sm font-semibold text-green-800 bg-green-50/50 rounded-xl text-left flex items-center gap-2 cursor-not-allowed"
                   >
                     <Info size={14} className="text-green-600 opacity-50" />
                     {s}
@@ -127,18 +121,6 @@ export const AISearch: React.FC = () => {
               </motion.div>
             ))}
           </AnimatePresence>
-
-          {isLoading && (
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex gap-4">
-              <div className="w-10 h-10 rounded-2xl bg-green-900 text-yellow-400 flex items-center justify-center animate-pulse">
-                <Bot size={20} />
-              </div>
-              <div className="bg-gray-50 p-4 rounded-3xl border border-gray-100 flex items-center gap-3">
-                <Loader2 className="animate-spin text-green-800" size={18} />
-                <span className="text-sm font-bold text-green-800 animate-pulse">Consulting records...</span>
-              </div>
-            </motion.div>
-          )}
         </div>
 
         {/* Input Area */}
@@ -152,26 +134,28 @@ export const AISearch: React.FC = () => {
                 type="text" 
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Type your query here..."
-                className="w-full pl-6 pr-12 py-4 bg-white border border-gray-200 rounded-3xl shadow-inner focus:ring-2 focus:ring-yellow-400 outline-none font-medium text-green-950 transition-all"
+                placeholder="AI Search will be available after API key setup..."
+                disabled
+                className="w-full pl-6 pr-12 py-4 bg-white border border-gray-200 rounded-3xl shadow-inner outline-none font-medium text-green-950 opacity-60 cursor-not-allowed"
               />
               <button 
                 type="button"
-                className="absolute right-4 top-1/2 -translate-y-1/2 text-green-800 opacity-30 hover:opacity-100 transition-opacity"
+                disabled
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-green-800 opacity-30 cursor-not-allowed"
               >
                 <Sparkles size={20} />
               </button>
             </div>
             <button 
               type="submit"
-              disabled={!query.trim() || isLoading}
-              className="p-4 bg-green-900 text-yellow-400 rounded-3xl hover:bg-green-800 transition-all disabled:opacity-50 disabled:grayscale disabled:cursor-not-allowed group shadow-lg"
+              disabled
+              className="p-4 bg-green-900 text-yellow-400 rounded-3xl opacity-50 grayscale cursor-not-allowed shadow-lg"
             >
-              <Send size={24} className="group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
+              <Send size={24} />
             </button>
           </form>
           <p className="text-[10px] text-gray-400 text-center mt-4 font-bold uppercase tracking-[0.2em]">
-            Powered by NMC-Core AI • Responses are generated based on internal database records
+            AI assistant disabled until Gemini API credentials are configured
           </p>
         </div>
       </div>

@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Calendar, Search, Filter, Clock, Download, Plus, CheckCircle2, XCircle, AlertCircle } from 'lucide-react';
-import { storageService } from '../../services/storageService';
+import { storageService } from '../../services/storageService.ts';
+import { useCurrentUser } from '../../hooks/useAuth';
 import { Logo } from '../../assets/common/Logo.tsx';
-import { type AttendanceRecord, AttendanceStatus, type Employee } from '../../types/types';
+import { type AttendanceRecord, AttendanceStatus, type Employee } from '../../types/types.ts';
 
 export const AttendanceRecords: React.FC = () => {
-  const currentUser = storageService.getCurrentUser();
+  const currentUser = useCurrentUser();
   const isEmployeeAccount = !!currentUser?.employeeId;
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);

@@ -33,7 +33,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, setActiveView, setSe
   const employees = storageService.getEmployees();
   const payroll = storageService.getPayroll();
   const leaves = storageService.getLeaves();
-  const users = storageService.getUsers();
   const attendance = storageService.getAttendance();
   const applicants = storageService.getApplicants();
 
@@ -302,8 +301,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, setActiveView, setSe
     retiredEmployees: employees.filter(e => e.status === 'Retired').length,
     totalMonthlyPayroll: payroll.reduce((acc, p) => acc + p.cola, 0),
     activeLeaves: leaves.filter(l => l.status === 'Approved').length,
-    totalUsers: users.length,
-  }), [employees, payroll, leaves, users]);
+  }), [employees, payroll, leaves]);
 
   // -- 1. Attendance Statistics Computation --
   const latestAttendanceDate = useMemo(() => {
@@ -532,13 +530,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, setActiveView, setSe
       </header>
 
       {/* Primary Stats Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {[
           { label: 'Total Employee', value: stats.totalEmployees, icon: Users, bg: 'bg-green-100', text: 'text-green-900', viewTarget: 'employees' },
           { label: 'Active Employee', value: stats.activeEmployees, icon: UserCheck, bg: 'bg-emerald-100', text: 'text-emerald-900', viewTarget: 'employees' },
           { label: 'Retired', value: stats.retiredEmployees, icon: UserX, bg: 'bg-orange-100', text: 'text-orange-900', viewTarget: 'employees' },
           { label: 'On Leave', value: stats.activeLeaves, icon: CalendarDays, bg: 'bg-purple-100', text: 'text-purple-900', viewTarget: 'leaves' },
-          { label: 'Users', value: stats.totalUsers, icon: UserPlus, bg: 'bg-blue-100', text: 'text-blue-900', viewTarget: 'administration' },
         ].map((stat, i) => (
           <motion.div 
             key={i}

@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { MessageSquare, Inbox, Search, Filter, CheckCircle2, Clock, Trash2, Send, ShieldAlert, AlertCircle, RefreshCw, Eye } from 'lucide-react';
-import { storageService } from '../../services/storageService';
-import { type FeedbackItem } from '../../types/types';
+import { storageService } from '../../services/storageService.ts';
+import { useCurrentUser } from '../../hooks/useAuth';
+import { type FeedbackItem } from '../../types/types.ts';
 import { Logo } from '../../assets/common/Logo.tsx';
 import { motion, AnimatePresence } from 'motion/react';
 
 export const FeedbackInbox: React.FC = () => {
-  const currentUser = storageService.getCurrentUser();
+  const currentUser = useCurrentUser();
   const [feedbacks, setFeedbacks] = useState<FeedbackItem[]>(() => storageService.getFeedback());
   
   // Search and Filter states

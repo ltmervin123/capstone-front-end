@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { MessageSquare, Send, X, AlertCircle, CheckCircle2, ShieldAlert, User, Mail, MessageCircle, Clock } from 'lucide-react';
 import { storageService } from '../../services/storageService';
+import { useCurrentUser } from '../../hooks/useAuth';
 import { type FeedbackItem } from '../../types/types';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -10,7 +11,7 @@ interface FeedbackModalProps {
 }
 
 export const FeedbackModal: React.FC<FeedbackModalProps> = ({ isOpen, onClose }) => {
-  const currentUser = storageService.getCurrentUser();
+  const currentUser = useCurrentUser();
   const [activeTab, setActiveTab] = useState<'submit' | 'history'>('submit');
   
   // Form fields

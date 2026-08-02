@@ -20,7 +20,6 @@ import {
 } from 'lucide-react';
 import { Role } from "../../types/types";
 import type { User } from '../../types/types';
-import { storageService } from '../../services/storageService';
 import { Logo } from '../../assets/common/Logo';
 
 interface SidebarProps {

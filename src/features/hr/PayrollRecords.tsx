@@ -18,12 +18,13 @@ import {
   Printer
 } from 'lucide-react';
 import { storageService } from '../../services/storageService';
+import { useCurrentUser } from '../../hooks/useAuth';
 import { Logo } from '../../assets/common/Logo.tsx';
 import type { PayrollRecord, Employee } from '../../types/types';
 import { motion, AnimatePresence } from 'motion/react';
 
 export const PayrollRecords: React.FC = () => {
-  const currentUser = storageService.getCurrentUser();
+  const currentUser = useCurrentUser();
   const isEmployeeAccount = !!currentUser?.employeeId;
   const [payrollList, setPayrollList] = useState<PayrollRecord[]>(() => storageService.getPayroll());
   const employees = useMemo(() => storageService.getEmployees(), []);

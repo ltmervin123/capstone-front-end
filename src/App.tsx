@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { LoginPage } from './features/auth/LoginPage';
 import { Sidebar } from './features/layout/Sidebar';
 import { Dashboard } from './features/dashboard/Dashboard.tsx';
@@ -17,37 +17,34 @@ import { TalentAcquisition } from './features/hr/TalentAcquisition';
 import { FeedbackInbox } from './features/hr/FeedbackInbox.tsx';
 import { FeedbackModal } from './assets/common/FeedbackModal.tsx';
 import { AdminDashboard } from './features/admin/AdminDashboard';
-import { storageService } from './services/storageService.ts';
 import { Logo } from './assets/common/Logo';
-import { type User, type Employee, Role } from './types/types.ts';
+import { type Employee, Role } from './types/types.ts';
 import { motion, AnimatePresence } from 'motion/react';
 import { MessageSquare } from 'lucide-react';
+import { useInitializeAuth, useLogout } from './hooks/useAuth';
+import { useAuthStore } from './stores/authStore';
+import { clearLegacyMockDataOnce } from './services/storageService.ts';
 
 export default function App() {
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  useInitializeAuth();
+
+  const currentUser = useAuthStore((state) => state.user);
+  const isInitialized = useAuthStore((state) => state.isInitialized);
+  const logoutMutation = useLogout();
   const [activeView, setActiveView] = useState<string>('dashboard');
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
-  const [isInitialized, setIsInitialized] = useState(false);
   const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false);
 
   useEffect(() => {
-    storageService.initData();
-    const user = storageService.getCurrentUser();
-    if (user) {
-      setCurrentUser(user);
-      setActiveView('dashboard');
-    }
-    setIsInitialized(true);
+    clearLegacyMockDataOnce();
   }, []);
 
   const handleLogout = () => {
-    storageService.setCurrentUser(null);
-    setCurrentUser(null);
+    logoutMutation.mutate();
     setActiveView('dashboard');
   };
 
-  const handleLoginSuccess = (user: User) => {
-    setCurrentUser(user);
+  const handleLoginSuccess = () => {
     setActiveView('dashboard');
   };
 

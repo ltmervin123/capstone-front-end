@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { CalendarDays, Check, X, Clock, Plus, FileText, Trash2, AlertCircle } from 'lucide-react';
 import { storageService } from '../../services/storageService';
+import { useCurrentUser } from '../../hooks/useAuth';
 import { Logo } from '../../assets/common/Logo.tsx';
 import { type LeaveRecord, LeaveType } from '../../types/types';
 import { motion, AnimatePresence } from 'motion/react';
 
 export const LeaveRecords: React.FC = () => {
-  const currentUser = storageService.getCurrentUser();
+  const currentUser = useCurrentUser();
   const [employees] = useState(() => storageService.getEmployees());
 
   // Check if current user is an employee account

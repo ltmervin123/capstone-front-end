@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
-import { ShieldCheck, Lock, User as UserIcon, AlertCircle, Eye, EyeOff } from 'lucide-react';
-import { storageService } from '../../services/storageService';
-import type { User, Role } from '../../types/types';
+import { Lock, User as UserIcon, AlertCircle, Eye, EyeOff } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Logo } from '../../assets/common/Logo';
+import { useLogin } from '../../hooks/useAuth';
+import { loginSchema } from './login.schema';
+import { ApiRequestError } from '../../utils/apiClient';
 
 interface LoginPageProps {
-  onLoginSuccess: (user: User) => void;
+  onLoginSuccess: () => void;
 }
 
 export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
@@ -14,48 +15,30 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const loginMutation = useLogin();
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
     setError(null);
 
-      // Simulate network delay
-      setTimeout(() => {
-        const users = storageService.getUsers();
-        const user = users.find(u => u.username === username || u.email === username);
+    const parsed = loginSchema.safeParse({ username, password });
+    if (!parsed.success) {
+      setError(parsed.error.issues[0]?.message ?? 'Invalid login credentials.');
+      return;
+    }
 
-        if (!user) {
-          setError('Invalid username.');
-          setIsLoading(false);
-          return;
-        }
+    try {
+      await loginMutation.mutateAsync(parsed.data);
+      onLoginSuccess();
+    } catch (err) {
+      if (err instanceof ApiRequestError) {
+        setError(err.message);
+        return;
+      }
 
-        if (!user.isActive) {
-          setError('Your account is deactivated. Contact Admin.');
-          setIsLoading(false);
-          return;
-        }
-
-        if (!user.isApproved) {
-          setError('Your account is pending approval.');
-          setIsLoading(false);
-          return;
-        }
-
-        // Enforce strict password validation
-        if (user.password && user.password !== password) {
-          setError('Invalid password. Check the credentials directory below.');
-          setIsLoading(false);
-          return;
-        }
-
-        storageService.setCurrentUser(user);
-        onLoginSuccess(user);
-        setIsLoading(false);
-      }, 800);
-    };
+      setError('Unable to sign in right now. Please try again.');
+    }
+  };
 
   return (
     <div className="min-h-screen bg-[#fdfcf0] flex flex-col items-center justify-center p-6 relative overflow-hidden text-green-950">
@@ -129,14 +112,14 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
 
             <button
               type="submit"
-              disabled={isLoading}
+              disabled={loginMutation.isPending}
               className={`
                 w-full py-4 bg-green-900 text-yellow-400 rounded-xl font-bold text-lg shadow-xl shadow-green-900/20 
                 hover:bg-green-800 hover:scale-[1.02] active:scale-[0.98] transition-all
                 disabled:opacity-70 disabled:cursor-not-allowed
               `}
             >
-              {isLoading ? (
+              {loginMutation.isPending ? (
                 <div className="flex items-center justify-center gap-2">
                   <div className="w-5 h-5 border-2 border-yellow-400 border-t-transparent rounded-full animate-spin" />
                   Authenticating...
@@ -146,51 +129,11 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
           </form>
 
           <div className="mt-8 pt-6 border-t border-gray-100 flex flex-col gap-3">
-            <h3 className="text-[10px] font-black text-green-800 uppercase tracking-widest text-center mb-1">📋 Testing Directory</h3>
-            
-            <div className="space-y-2 max-h-[190px] overflow-y-auto pr-1">
-              {/* ADMIN */}
-              <div className="p-2.5 bg-green-50/50 rounded-xl border border-green-200/40 text-xs flex flex-col gap-1">
-                <div className="flex justify-between items-center">
-                  <span className="font-extrabold text-green-950">👑 System Admin</span>
-                  <span className="px-1.5 py-0.5 bg-green-900 text-yellow-400 text-[8px] font-black uppercase rounded">Full Access</span>
-                </div>
-                <div className="font-mono text-[10px] text-gray-500 whitespace-nowrap">
-                  User: <span className="font-bold text-green-800">admin</span> | Pass: <span className="font-bold text-green-800">AdminPassword123!</span>
-                </div>
-              </div>
-
-              {/* HR */}
-              <div className="p-2.5 bg-yellow-50/20 rounded-xl border border-yellow-250/30 text-xs flex flex-col gap-1">
-                <div className="flex justify-between items-center">
-                  <span className="font-extrabold text-green-950">💼 HR Personnel</span>
-                  <span className="px-1.5 py-0.5 bg-yellow-400 text-green-950 text-[8px] font-black uppercase rounded">Standard HR</span>
-                </div>
-                <div className="font-mono text-[10px] text-gray-500 whitespace-nowrap">
-                  User: <span className="font-bold text-green-800">hr_personnel</span> | Pass: <span className="font-bold text-green-800">HrPassword123!</span>
-                </div>
-              </div>
-
-              {/* EMPLOYEE DEMO WITH LIMITATIONS */}
-              <div className="p-2.5 bg-blue-50/30 rounded-xl border border-blue-100 text-xs flex flex-col gap-1">
-                <div className="flex justify-between items-center">
-                  <span className="font-extrabold text-green-950">👤 Juan Dela Cruz</span>
-                  <span className="px-1.5 py-0.5 bg-blue-900 text-white text-[8px] font-black uppercase rounded">Employee</span>
-                </div>
-                <div className="font-mono text-[10px] text-gray-500 whitespace-nowrap">
-                  User: <span className="font-bold text-green-850">juan_delacruz</span> | Pass: <span className="font-bold text-green-800 font-extrabold">EmpPassword123!</span>
-                </div>
-                <p className="text-[9px] text-zinc-500 leading-tight">
-                  <strong className="text-red-650 uppercase">Access Limits:</strong> Can ONLY access his own information. Custom Employee Dashboard features his personal attendance index, his private payslips list, and performance indicators without other staff names visible.
-                </p>
-              </div>
-            </div>
-
-            <button className="text-sm font-bold text-green-700 hover:text-green-900 transition-colors text-center mt-3">
+            <button type="button" className="text-sm font-bold text-green-700 hover:text-green-900 transition-colors text-center">
               Forgot password?
             </button>
             <p className="text-[10px] text-gray-400 text-center uppercase tracking-widest leading-relaxed">
-              For security reasons, multiple failed attempts may lead to permanent account suspension.
+              Sign in with your database account. Contact an administrator if you need access.
             </p>
           </div>
         </div>

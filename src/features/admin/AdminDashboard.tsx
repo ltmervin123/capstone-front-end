@@ -20,7 +20,7 @@ import { type User, Role } from '../../types/types';
 import { motion } from 'motion/react';
 
 export const AdminDashboard: React.FC = () => {
-  const [users, setUsers] = useState<User[]>(storageService.getUsers());
+  const [users, setUsers] = useState<User[]>([]);
   const [activeTab, setActiveTab] = useState<'registry' | 'approvals' | 'logs'>('registry');
   
   // Registry Filters
@@ -100,7 +100,6 @@ export const AdminDashboard: React.FC = () => {
     setUsers(updated);
     const u = updated.find(x => x.id === userId);
     if (u) {
-      storageService.saveUser(u);
       storageService.addLog('Admin', `${u.isActive ? 'Activated' : 'Disabled'} user: ${u.username}`);
     }
   };
@@ -123,7 +122,6 @@ export const AdminDashboard: React.FC = () => {
     setUsers(updated);
     const u = updated.find(x => x.id === userId);
     if (u) {
-      storageService.saveUser(u);
       storageService.addLog('Admin', `Approved user register request: ${u.username}`);
     }
   };
@@ -133,7 +131,6 @@ export const AdminDashboard: React.FC = () => {
     if (u) {
       const updated = users.filter(x => x.id !== userId);
       setUsers(updated);
-      localStorage.setItem('normi_hr_users', JSON.stringify(updated));
       storageService.addLog('Admin', `Declined and deleted registration: ${u.username}`);
     }
   };
@@ -141,13 +138,12 @@ export const AdminDashboard: React.FC = () => {
   const handleDeleteUser = (userId: string) => {
     const u = users.find(x => x.id === userId);
     if (u) {
-      if (u.id === 'admin-1') {
+      if (u.role === Role.ADMIN) {
         alert('Cannot delete primary administrator.');
         return;
       }
       const updated = users.filter(x => x.id !== userId);
       setUsers(updated);
-      localStorage.setItem('normi_hr_users', JSON.stringify(updated));
       storageService.addLog('Admin', `Deleted user account: ${u.username}`);
     }
   };
@@ -187,7 +183,6 @@ export const AdminDashboard: React.FC = () => {
     };
     const updated = [...users, newUserRecord];
     setUsers(updated);
-    localStorage.setItem('normi_hr_users', JSON.stringify(updated));
     storageService.addLog('Admin', `Created new user: ${newUserRecord.username}`, `Admin: ${newUserRecord.role === Role.ADMIN}`);
     setNewUser({ 
       username: '', 
@@ -237,10 +232,8 @@ export const AdminDashboard: React.FC = () => {
       return u;
     });
     setUsers(updated);
-    localStorage.setItem('normi_hr_users', JSON.stringify(updated));
     const target = updated.find(x => x.id === userId);
     if (target) {
-      storageService.saveUser(target);
       storageService.addLog('Admin', `Updated access rule limits for: ${target.username}`);
     }
     setEditingUserId(null);
