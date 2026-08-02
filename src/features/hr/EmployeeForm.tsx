@@ -1,8 +1,34 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Save, X, RotateCcw, User, Briefcase, MapPin, Phone, Calendar as CalendarIcon, GraduationCap, ClipboardCheck, Camera, Upload, Trash2, Eye, Coins, Calculator } from 'lucide-react';
-import type { Employee, DEPARTMENTS } from '../../types/types';
+import React, { useState, useRef } from 'react';
+import { Save, X, RotateCcw, User, Briefcase, MapPin, GraduationCap, ClipboardCheck, Camera, Upload, Trash2, Eye, Coins } from 'lucide-react';
+import { DEPARTMENTS, type Employee } from '../../types/types';
 import { storageService } from '../../services/storageService';
 import { motion, AnimatePresence } from 'motion/react';
+
+type ChecklistCategory = keyof NonNullable<Employee['checklist']>;
+type AttachmentCategory = keyof NonNullable<Employee['attachments']>;
+
+const EMPTY_CHECKLIST: NonNullable<Employee['checklist']> = {
+  personalInfo: {},
+  educational: {},
+  employment: {},
+  government: {},
+  training: {},
+  administrative: {},
+};
+
+const EMPTY_ATTACHMENTS: NonNullable<Employee['attachments']> = {
+  personalInfo: {},
+  educational: {},
+  employment: {},
+  government: {},
+  training: {},
+  administrative: {},
+};
+
+type EmployeeFormData = Omit<Employee, 'updatedAt' | 'checklist' | 'attachments'> & {
+  checklist: NonNullable<Employee['checklist']>;
+  attachments: NonNullable<Employee['attachments']>;
+};
 
 interface EmployeeFormProps {
   employee: Employee | null;
@@ -13,7 +39,7 @@ interface EmployeeFormProps {
 }
 
 export const EmployeeForm: React.FC<EmployeeFormProps> = ({ employee, onCancel, onSuccess, title, isReadOnly = false }) => {
-  const initialData: Omit<Employee, 'updatedAt'> = {
+  const initialData: EmployeeFormData = {
     id: employee?.id || '',
     surname: employee?.surname || '',
     firstName: employee?.firstName || '',
@@ -40,28 +66,14 @@ export const EmployeeForm: React.FC<EmployeeFormProps> = ({ employee, onCancel, 
     gasoline: employee?.gasoline !== undefined ? employee.gasoline : 1000,
     cashAdvance: employee?.cashAdvance !== undefined ? employee.cashAdvance : 0,
     employeeShare: employee?.employeeShare !== undefined ? employee.employeeShare : 1200,
-    checklist: employee?.checklist || {
-      personalInfo: {},
-      educational: {},
-      employment: {},
-      government: {},
-      training: {},
-      administrative: {},
-    },
-    attachments: employee?.attachments || {
-      personalInfo: {},
-      educational: {},
-      employment: {},
-      government: {},
-      training: {},
-      administrative: {},
-    }
+    checklist: employee?.checklist ?? EMPTY_CHECKLIST,
+    attachments: employee?.attachments ?? EMPTY_ATTACHMENTS,
   };
 
-  const [formData, setFormData] = useState(initialData);
+  const [formData, setFormData] = useState<EmployeeFormData>(initialData);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const checklistFileInputRef = useRef<HTMLInputElement>(null);
-  const [activeChecklistPath, setActiveChecklistPath] = useState<{ category: string, item: string } | null>(null);
+  const [activeChecklistPath, setActiveChecklistPath] = useState<{ category: ChecklistCategory; item: string } | null>(null);
   const [viewerAttachment, setViewerAttachment] = useState<{ name: string; data: string } | null>(null);
   const [showAllAttachmentsModal, setShowAllAttachmentsModal] = useState(false);
 
@@ -71,13 +83,13 @@ export const EmployeeForm: React.FC<EmployeeFormProps> = ({ employee, onCancel, 
     onSuccess();
   };
 
-  const handleChecklistChange = (category: keyof NonNullable<Employee['checklist']>, item: string, checked: boolean) => {
+  const handleChecklistChange = (category: ChecklistCategory, item: string, checked: boolean) => {
     setFormData(prev => ({
       ...prev,
       checklist: {
-        ...prev.checklist!,
+        ...prev.checklist,
         [category]: {
-          ...prev.checklist![category],
+          ...prev.checklist[category],
           [item]: checked
         }
       }
@@ -111,16 +123,16 @@ export const EmployeeForm: React.FC<EmployeeFormProps> = ({ employee, onCancel, 
         setFormData(prev => ({
           ...prev,
           checklist: {
-            ...prev.checklist!,
+            ...prev.checklist,
             [category]: {
-              ...prev.checklist![category as keyof Employee['checklist']],
+              ...prev.checklist[category],
               [item]: true // Automatically check if uploaded
             }
           },
           attachments: {
-            ...prev.attachments!,
+            ...prev.attachments,
             [category]: {
-              ...prev.attachments![category as keyof Employee['attachments']],
+              ...prev.attachments[category],
               [item]: reader.result as string
             }
           }
@@ -130,22 +142,24 @@ export const EmployeeForm: React.FC<EmployeeFormProps> = ({ employee, onCancel, 
     }
   };
 
-  const triggerChecklistUpload = (category: string, item: string) => {
+  const triggerChecklistUpload = (category: ChecklistCategory, item: string) => {
     setActiveChecklistPath({ category, item });
     setTimeout(() => {
       checklistFileInputRef.current?.click();
     }, 0);
   };
 
-  const removeAttachment = (category: string, item: string) => {
+  const removeAttachment = (category: AttachmentCategory, item: string) => {
     setFormData(prev => {
-      const newAttachments = { ...prev.attachments };
-      if (newAttachments[category as keyof Employee['attachments']]) {
-        const categoryAttachments = { ...newAttachments[category as keyof Employee['attachments']] };
-        delete categoryAttachments[item];
-        newAttachments[category as keyof Employee['attachments']] = categoryAttachments;
-      }
-      return { ...prev, attachments: newAttachments };
+      const categoryAttachments: Record<string, string> = { ...(prev.attachments[category] ?? {}) };
+      delete categoryAttachments[item];
+      return {
+        ...prev,
+        attachments: {
+          ...prev.attachments,
+          [category]: categoryAttachments,
+        },
+      };
     });
   };
 
@@ -246,16 +260,13 @@ export const EmployeeForm: React.FC<EmployeeFormProps> = ({ employee, onCancel, 
 
   const handleToggleAllChecklist = (checked: boolean) => {
     setFormData(prev => {
-      const newChecklist = { ...prev.checklist };
+      const newChecklist: EmployeeFormData['checklist'] = { ...EMPTY_CHECKLIST, ...prev.checklist };
       checklistStructure.forEach((category) => {
         const catId = category.id;
-        if (!newChecklist[catId]) {
-          newChecklist[catId] = {};
-        }
         category.items.forEach((item) => {
           newChecklist[catId] = {
             ...newChecklist[catId],
-            [item]: checked
+            [item]: checked,
           };
         });
       });
@@ -263,18 +274,15 @@ export const EmployeeForm: React.FC<EmployeeFormProps> = ({ employee, onCancel, 
     });
   };
 
-  const handleToggleCategoryChecklist = (categoryId: string, checked: boolean) => {
+  const handleToggleCategoryChecklist = (categoryId: ChecklistCategory, checked: boolean) => {
     setFormData(prev => {
-      const newChecklist = { ...prev.checklist };
-      if (!newChecklist[categoryId]) {
-        newChecklist[categoryId] = {};
-      }
+      const newChecklist: EmployeeFormData['checklist'] = { ...EMPTY_CHECKLIST, ...prev.checklist };
       const catObj = checklistStructure.find(c => c.id === categoryId);
       if (catObj) {
         catObj.items.forEach((item) => {
           newChecklist[categoryId] = {
             ...newChecklist[categoryId],
-            [item]: checked
+            [item]: checked,
           };
         });
       }
@@ -282,10 +290,10 @@ export const EmployeeForm: React.FC<EmployeeFormProps> = ({ employee, onCancel, 
     });
   };
 
-  const isCategoryFullyChecked = (categoryId: string) => {
+  const isCategoryFullyChecked = (categoryId: ChecklistCategory) => {
     const catObj = checklistStructure.find(c => c.id === categoryId);
     if (!catObj) return false;
-    return catObj.items.every(item => formData.checklist?.[categoryId]?.[item] || false);
+    return catObj.items.every(item => formData.checklist[categoryId]?.[item] || false);
   };
 
   const getChecklistStatistics = () => {
