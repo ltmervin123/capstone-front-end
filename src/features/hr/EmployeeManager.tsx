@@ -1,7 +1,9 @@
 import React, { useState, useRef } from 'react';
-import { Plus, Search, Filter, Edit2, Trash2, Printer, X, Eye, LayoutGrid, List as ListIcon, Users, History, Activity, Download, Sparkles, Upload, AlertCircle, ArrowRight, Loader2, Fingerprint } from 'lucide-react';
+import { Plus, Search, Filter, Edit2, Trash2, Printer, X, Eye, Users, History, Activity, Download, Upload, AlertCircle, ArrowRight, Loader2, Fingerprint } from 'lucide-react';
 import { type Employee, DEPARTMENTS } from '../../types/types';
 import { storageService } from '../../services/storageService';
+import { ApiRequestError } from '../../utils/apiClient';
+import { useEmployeesQuery } from '../../hooks/useEmployees';
 import { EmployeeForm } from './EmployeeForm';
 import { Logo } from '../../assets/common/Logo.tsx';
 import { motion, AnimatePresence } from 'motion/react';
@@ -20,16 +22,26 @@ export const EmployeeManager: React.FC = () => {
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRefForPds = useRef<HTMLInputElement>(null);
   
-  // Directory state
+  // Directory state (API-backed via TanStack Query)
+  const employeesQuery = useEmployeesQuery();
+  const employees = employeesQuery.data ?? [];
+  const listLoading = employeesQuery.isPending;
+  const listError =
+    employeesQuery.error instanceof ApiRequestError
+      ? employeesQuery.error.message
+      : employeesQuery.error instanceof Error
+        ? employeesQuery.error.message
+        : employeesQuery.error
+          ? 'Failed to load employees.'
+          : null;
+
   const [searchTerm, setSearchTerm] = useState('');
   const [filterDept, setFilterDept] = useState('All');
   const [filterStatus, setFilterStatus] = useState('All');
 
-  // Unified Logs state
+  // Unified Logs state (still local until audit API is wired)
   const [logSearchQuery, setLogSearchQuery] = useState('');
   const [logFilterUser, setLogFilterUser] = useState('All');
-  
-  const employees = storageService.getEmployees();
   
   const filteredEmployees = employees.filter(emp => {
     const matchesSearch = `${emp.firstName} ${emp.surname} ${emp.id}`.toLowerCase().includes(searchTerm.toLowerCase());
@@ -37,8 +49,6 @@ export const EmployeeManager: React.FC = () => {
     const matchesStatus = filterStatus === 'All' || emp.status === filterStatus;
     return matchesSearch && matchesDept && matchesStatus;
   });
-
-  const departments = Array.from(new Set(employees.map(e => e.department)));
 
   const allLogs = storageService.getLogs();
   const logInitiators = Array.from(new Set(allLogs.map(l => l.username)));
@@ -78,6 +88,14 @@ export const EmployeeManager: React.FC = () => {
   const handleAddNew = () => {
     setParseError(null);
     setAddModeModalOpen(true);
+  };
+
+  const openEmptyRegistrationForm = () => {
+    setSelectedEmployee(null);
+    setFormTitle('Add Employee Registration');
+    setFormReadOnly(false);
+    setView('form');
+    setAddModeModalOpen(false);
   };
 
   const handleFileSelectAndParse = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -143,8 +161,7 @@ export const EmployeeManager: React.FC = () => {
 
       const parsed = await response.json();
       
-      const currentCount = storageService.getEmployees().length;
-      const nextId = `EMP-${String(currentCount + 1).padStart(3, '0')}`;
+      const nextId = `EMP-${String(employees.length + 1).padStart(3, '0')}`;
 
       const draftedEmp: Employee = {
         id: nextId,
@@ -196,9 +213,10 @@ export const EmployeeManager: React.FC = () => {
       setFormReadOnly(false);
       setView('form');
       setAddModeModalOpen(false);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
-      setParseError(err.message || "Could not successfully parse this document. Please check the file contents.");
+      const message = err instanceof Error ? err.message : 'Could not successfully parse this document. Please check the file contents.';
+      setParseError(message);
     } finally {
       setParseLoading(false);
     }
@@ -207,16 +225,12 @@ export const EmployeeManager: React.FC = () => {
   const handleFormSuccess = () => {
     setView('list');
     setSelectedEmployee(null);
-    // Force re-render would be better with real state management, 
-    // but for this demo environment window.location.reload() or internal state triggers work.
+    setFormTitle(undefined);
+    setFormReadOnly(false);
   };
 
-  const handleDelete = (id: string) => {
-    if (window.confirm('Are you sure you want to delete this employee record?')) {
-      storageService.deleteEmployee(id);
-      // Force refresh of the local component data
-      window.location.reload(); 
-    }
+  const handleDelete = () => {
+    window.alert('Delete employee API is not wired yet.');
   };
 
   return (
@@ -284,6 +298,22 @@ export const EmployeeManager: React.FC = () => {
 
             {activeTab === 'directory' ? (
               <>
+                {listError && (
+                  <div className="flex items-start gap-3 p-4 bg-red-50 rounded-2xl border border-red-100 text-red-800 text-xs">
+                    <AlertCircle size={18} className="shrink-0 text-red-600 mt-0.5" />
+                    <div className="flex-1">
+                      <span className="font-bold">Could not load employees:</span> {listError}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => void employeesQuery.refetch()}
+                      className="text-[10px] font-black uppercase tracking-wider text-red-700 hover:underline"
+                    >
+                      Retry
+                    </button>
+                  </div>
+                )}
+
                 <div className="bg-white p-5 rounded-[40px] border border-gray-100 shadow-xl flex flex-col md:flex-row gap-4">
                   <div className="flex-1 relative">
                     <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
@@ -331,7 +361,17 @@ export const EmployeeManager: React.FC = () => {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-50">
-                        {filteredEmployees.map((emp) => (
+                        {listLoading && (
+                          <tr>
+                            <td colSpan={6} className="px-8 py-20 text-center">
+                              <div className="flex flex-col items-center gap-3 text-green-900">
+                                <Loader2 size={32} className="animate-spin" />
+                                <p className="font-black uppercase text-xs tracking-[0.3em]">Loading employees...</p>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                        {!listLoading && filteredEmployees.map((emp) => (
                           <tr key={emp.id} className="hover:bg-yellow-50/50 transition-colors group">
                             <td className="px-8 py-5">
                               <div className="flex items-center gap-4">
@@ -381,7 +421,7 @@ export const EmployeeManager: React.FC = () => {
                                   <Edit2 size={16} />
                                 </button>
                                 <button 
-                                  onClick={() => handleDelete(emp.id)}
+                                  onClick={handleDelete}
                                   className="p-2.5 text-red-600 bg-white border border-gray-100 rounded-xl shadow-sm hover:bg-red-50 transition-colors cursor-pointer" title="Delete Record"
                                 >
                                   <Trash2 size={16} />
@@ -393,7 +433,7 @@ export const EmployeeManager: React.FC = () => {
                             </td>
                           </tr>
                         ))}
-                        {filteredEmployees.length === 0 && (
+                        {!listLoading && filteredEmployees.length === 0 && (
                           <tr>
                             <td colSpan={6} className="px-8 py-20 text-center">
                               <div className="flex flex-col items-center gap-3 opacity-30">
@@ -649,13 +689,7 @@ export const EmployeeManager: React.FC = () => {
                     <div className="mt-6 pt-5">
                       <button
                         type="button"
-                        onClick={() => {
-                          setSelectedEmployee(null);
-                          setFormTitle('Add Employee Registration');
-                          setFormReadOnly(false);
-                          setView('form');
-                          setAddModeModalOpen(false);
-                        }}
+                        onClick={openEmptyRegistrationForm}
                         disabled={parseLoading}
                         className="w-full flex items-center justify-center gap-2 py-3.5 px-5 bg-white border border-gray-200 hover:border-gray-300 text-green-950 font-black rounded-2xl shadow-sm hover:shadow-md transition-all text-xs uppercase tracking-wider cursor-pointer disabled:opacity-50"
                       >

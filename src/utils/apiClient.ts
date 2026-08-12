@@ -47,7 +47,8 @@ export async function apiRequest<T>(
 ): Promise<T> {
   const headers = new Headers(options.headers);
 
-  if (options.body && !headers.has('Content-Type')) {
+  // Let the browser set multipart boundary for FormData uploads.
+  if (options.body && !(options.body instanceof FormData) && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json');
   }
 

@@ -1,7 +1,10 @@
 import React, { useState, useRef } from 'react';
-import { Save, X, RotateCcw, User, Briefcase, MapPin, GraduationCap, ClipboardCheck, Camera, Upload, Trash2, Eye, Coins } from 'lucide-react';
+import { Save, X, RotateCcw, User, Briefcase, MapPin, GraduationCap, ClipboardCheck, Camera, Upload, Trash2, Eye, Coins, Loader2, AlertCircle } from 'lucide-react';
 import { DEPARTMENTS, type Employee } from '../../types/types';
-import { storageService } from '../../services/storageService';
+import { type CreateEmployeeAttachment } from '../../services/employeeService';
+import { ApiRequestError } from '../../utils/apiClient';
+import { useCreateEmployee } from '../../hooks/useEmployees';
+import { createEmployeeFormSchema } from '../../schemas/employee.schema';
 import { motion, AnimatePresence } from 'motion/react';
 
 type ChecklistCategory = keyof NonNullable<Employee['checklist']>;
@@ -38,7 +41,34 @@ interface EmployeeFormProps {
   isReadOnly?: boolean;
 }
 
+function isMetadataOnlyAttachment(value: string | undefined): boolean {
+  return !!value && value.startsWith('meta:');
+}
+
+function isStoredAssetUrl(value: string | undefined): boolean {
+  return !!value && (value.startsWith('/api/assets/') || value.startsWith('http://') || value.startsWith('https://'));
+}
+
+function isPdfAttachment(value: string, name: string): boolean {
+  const lowerName = name.toLowerCase();
+  const lowerValue = value.toLowerCase();
+  if (value.startsWith('data:application/pdf')) return true;
+  if (value.startsWith('blob:') && lowerName.endsWith('.pdf')) return true;
+  if (isStoredAssetUrl(value) && (lowerValue.includes('.pdf') || lowerName.endsWith('.pdf'))) return true;
+  return false;
+}
+
+function parseMetadataLabel(value: string): string {
+  const raw = value.replace(/^meta:/, '');
+  const [fileName, mimeType, size] = raw.split('|');
+  const sizeLabel = size ? `${Math.round(Number(size) / 1024)} KB` : 'unknown size';
+  return `${fileName || 'file'} (${mimeType || 'unknown type'}, ${sizeLabel}) — metadata only`;
+}
+
 export const EmployeeForm: React.FC<EmployeeFormProps> = ({ employee, onCancel, onSuccess, title, isReadOnly = false }) => {
+  const createEmployee = useCreateEmployee();
+  const isCreateMode = !employee || (title?.startsWith('Add Employee Registration') ?? false);
+
   const initialData: EmployeeFormData = {
     id: employee?.id || '',
     surname: employee?.surname || '',
@@ -71,16 +101,84 @@ export const EmployeeForm: React.FC<EmployeeFormProps> = ({ employee, onCancel, 
   };
 
   const [formData, setFormData] = useState<EmployeeFormData>(initialData);
+  const [profilePictureFile, setProfilePictureFile] = useState<File | null>(null);
+  const [attachmentFiles, setAttachmentFiles] = useState<Partial<Record<ChecklistCategory, Record<string, File>>>>({});
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const checklistFileInputRef = useRef<HTMLInputElement>(null);
   const [activeChecklistPath, setActiveChecklistPath] = useState<{ category: ChecklistCategory; item: string } | null>(null);
   const [viewerAttachment, setViewerAttachment] = useState<{ name: string; data: string } | null>(null);
   const [showAllAttachmentsModal, setShowAllAttachmentsModal] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const isSubmitting = createEmployee.isPending;
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    storageService.saveEmployee({ ...formData, updatedAt: Date.now() });
-    onSuccess();
+    setSubmitError(null);
+
+    if (!isCreateMode) {
+      setSubmitError('Employee update API is not wired yet. Use Add Employee Registration to create new records.');
+      return;
+    }
+
+    const parsed = createEmployeeFormSchema.safeParse({
+      employeeNumber: formData.id,
+      surname: formData.surname,
+      firstName: formData.firstName,
+      middleName: formData.middleName,
+      dateOfBirth: formData.dateOfBirth,
+      sex: formData.sex,
+      maritalStatus: formData.maritalStatus,
+      religion: formData.religion,
+      homeAddress: formData.homeAddress,
+      contactNumber: formData.contactNumber,
+      email: formData.email,
+      position: formData.position,
+      department: formData.department,
+      employmentDate: formData.employmentDate,
+      serviceDuration: formData.serviceDuration,
+      status: formData.status,
+      educationLevel: formData.educationLevel,
+      bachelorsDegree: formData.bachelorsDegree,
+      mastersStatus: formData.mastersStatus,
+      mastersDegreeName: formData.mastersDegreeName,
+      doctorateStatus: formData.doctorateStatus,
+      functionalRate: formData.functionalRate,
+      gasoline: formData.gasoline,
+      cashAdvance: formData.cashAdvance,
+      employeeShare: formData.employeeShare,
+      checklist: formData.checklist,
+    });
+
+    if (!parsed.success) {
+      setSubmitError(parsed.error.issues.map((issue) => issue.message).join(', '));
+      return;
+    }
+
+    const attachments: CreateEmployeeAttachment[] = [];
+    (Object.keys(attachmentFiles) as ChecklistCategory[]).forEach((categoryId) => {
+      const categoryFiles = attachmentFiles[categoryId] ?? {};
+      Object.entries(categoryFiles).forEach(([itemName, file]) => {
+        attachments.push({ categoryId, itemName, file });
+      });
+    });
+
+    try {
+      await createEmployee.mutateAsync({
+        payload: parsed.data,
+        profilePicture: profilePictureFile,
+        attachments,
+      });
+      onSuccess();
+    } catch (error) {
+      const message =
+        error instanceof ApiRequestError
+          ? error.message
+          : error instanceof Error
+            ? error.message
+            : 'Failed to create employee.';
+      setSubmitError(message);
+    }
   };
 
   const handleChecklistChange = (category: ChecklistCategory, item: string, checked: boolean) => {
@@ -98,48 +196,67 @@ export const EmployeeForm: React.FC<EmployeeFormProps> = ({ employee, onCancel, 
 
   const handleProfilePictureUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setFormData(prev => ({ ...prev, profilePicture: reader.result as string }));
-      };
-      reader.readAsDataURL(file);
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      alert('File size too large. Please upload images smaller than 5MB.');
+      return;
     }
+
+    if (formData.profilePicture?.startsWith('blob:')) {
+      URL.revokeObjectURL(formData.profilePicture);
+    }
+
+    const previewUrl = URL.createObjectURL(file);
+    setProfilePictureFile(file);
+    setFormData((prev) => ({ ...prev, profilePicture: previewUrl }));
   };
 
   const handleChecklistFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file && activeChecklistPath) {
       const { category, item } = activeChecklistPath;
-      
-      // Limit file size to 2MB for base64 storage
-      if (file.size > 2 * 1024 * 1024) {
-        alert('File size too large. Please upload files smaller than 2MB.');
+
+      if (file.size > 5 * 1024 * 1024) {
+        alert('File size too large. Please upload files smaller than 5MB.');
         return;
       }
 
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setFormData(prev => ({
-          ...prev,
-          checklist: {
-            ...prev.checklist,
-            [category]: {
-              ...prev.checklist[category],
-              [item]: true // Automatically check if uploaded
-            }
+      const previousPreview = formData.attachments?.[category]?.[item];
+      if (previousPreview?.startsWith('blob:')) {
+        URL.revokeObjectURL(previousPreview);
+      }
+
+      const previewUrl = URL.createObjectURL(file);
+
+      setAttachmentFiles((prev) => ({
+        ...prev,
+        [category]: {
+          ...(prev[category] ?? {}),
+          [item]: file,
+        },
+      }));
+
+      setFormData((prev) => ({
+        ...prev,
+        checklist: {
+          ...prev.checklist,
+          [category]: {
+            ...prev.checklist[category],
+            [item]: true,
           },
-          attachments: {
-            ...prev.attachments,
-            [category]: {
-              ...prev.attachments[category],
-              [item]: reader.result as string
-            }
-          }
-        }));
-      };
-      reader.readAsDataURL(file);
+        },
+        attachments: {
+          ...prev.attachments,
+          [category]: {
+            ...prev.attachments[category],
+            [item]: previewUrl,
+          },
+        },
+      }));
     }
+
+    e.target.value = '';
   };
 
   const triggerChecklistUpload = (category: ChecklistCategory, item: string) => {
@@ -150,7 +267,18 @@ export const EmployeeForm: React.FC<EmployeeFormProps> = ({ employee, onCancel, 
   };
 
   const removeAttachment = (category: AttachmentCategory, item: string) => {
-    setFormData(prev => {
+    const previousPreview = formData.attachments?.[category]?.[item];
+    if (previousPreview?.startsWith('blob:')) {
+      URL.revokeObjectURL(previousPreview);
+    }
+
+    setAttachmentFiles((prev) => {
+      const nextCategory = { ...(prev[category] ?? {}) };
+      delete nextCategory[item];
+      return { ...prev, [category]: nextCategory };
+    });
+
+    setFormData((prev) => {
       const categoryAttachments: Record<string, string> = { ...(prev.attachments[category] ?? {}) };
       delete categoryAttachments[item];
       return {
@@ -356,6 +484,15 @@ export const EmployeeForm: React.FC<EmployeeFormProps> = ({ employee, onCancel, 
         </div>
 
         <form onSubmit={handleSubmit} className="p-8 space-y-8">
+          {submitError && (
+            <div className="flex items-start gap-3 p-4 bg-red-50 rounded-2xl border border-red-100 text-red-800 text-xs">
+              <AlertCircle size={18} className="shrink-0 text-red-600 mt-0.5" />
+              <div>
+                <span className="font-bold">Could not save employee:</span> {submitError}
+              </div>
+            </div>
+          )}
+
           {/* Identity Section */}
           <section className="space-y-6">
             <div className="flex items-center gap-2 pb-2 border-b border-gray-100">
@@ -398,7 +535,13 @@ export const EmployeeForm: React.FC<EmployeeFormProps> = ({ employee, onCancel, 
                 {formData.profilePicture && !isReadOnly && (
                   <button 
                     type="button"
-                    onClick={() => setFormData(p => ({ ...p, profilePicture: '' }))}
+                    onClick={() => {
+                      if (formData.profilePicture?.startsWith('blob:')) {
+                        URL.revokeObjectURL(formData.profilePicture);
+                      }
+                      setProfilePictureFile(null);
+                      setFormData((p) => ({ ...p, profilePicture: '' }));
+                    }}
                     className="text-[10px] font-black text-red-500 uppercase tracking-widest hover:text-red-700 transition-colors"
                   >
                     Remove Photo
@@ -855,7 +998,7 @@ export const EmployeeForm: React.FC<EmployeeFormProps> = ({ employee, onCancel, 
                               title="View Document"
                             >
                               <Eye size={12} className="text-green-700" />
-                              <span>View</span>
+                              <span>{isMetadataOnlyAttachment(formData.attachments?.[category.id]?.[item]) ? 'Meta' : 'View'}</span>
                             </button>
                           )}
                           
@@ -930,10 +1073,11 @@ export const EmployeeForm: React.FC<EmployeeFormProps> = ({ employee, onCancel, 
                 </button>
                 <button
                   type="submit"
-                  className="w-full sm:w-auto px-10 py-3 bg-green-900 text-yellow-400 font-black rounded-2xl shadow-xl shadow-green-900/20 hover:scale-[1.03] active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                  disabled={isSubmitting}
+                  className="w-full sm:w-auto px-10 py-3 bg-green-900 text-yellow-400 font-black rounded-2xl shadow-xl shadow-green-900/20 hover:scale-[1.03] active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-60 disabled:hover:scale-100"
                 >
-                  <Save size={20} />
-                  {employee ? 'Update Record' : 'Commit Record'}
+                  {isSubmitting ? <Loader2 size={20} className="animate-spin" /> : <Save size={20} />}
+                  {isSubmitting ? 'Saving...' : isCreateMode ? 'Commit Record' : 'Update Record'}
                 </button>
               </>
             )}
@@ -978,7 +1122,15 @@ export const EmployeeForm: React.FC<EmployeeFormProps> = ({ employee, onCancel, 
               </div>
 
               <div className="flex-1 p-6 bg-gray-50 flex flex-col items-center justify-center overflow-auto min-h-0">
-                {viewerAttachment.data.startsWith('data:application/pdf') ? (
+                {isMetadataOnlyAttachment(viewerAttachment.data) ? (
+                  <div className="max-w-lg text-center space-y-3 p-6 bg-white rounded-2xl border border-gray-100 shadow-sm">
+                    <AlertCircle className="mx-auto text-green-800" size={28} />
+                    <p className="text-sm font-bold text-green-950">File content was not stored</p>
+                    <p className="text-xs text-gray-500 font-medium leading-relaxed">
+                      {parseMetadataLabel(viewerAttachment.data)}
+                    </p>
+                  </div>
+                ) : isPdfAttachment(viewerAttachment.data, viewerAttachment.name) ? (
                   <div className="w-full h-full flex flex-col gap-4">
                      <embed 
                       src={viewerAttachment.data} 
