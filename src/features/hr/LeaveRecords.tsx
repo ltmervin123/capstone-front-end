@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { CalendarDays, Check, X, Clock, Plus, FileText, Trash2, AlertCircle, Loader2 } from 'lucide-react';
 import { useCurrentUser } from '../../hooks/useAuth';
-import { useCreateLeave, useLeavesQuery } from '../../hooks/useLeaves';
+import { useCreateLeave, useDeleteLeave, useLeavesQuery } from '../../hooks/useLeaves';
 import { useEmployeesQuery } from '../../hooks/useEmployees';
 import { createLeaveFormSchema } from '../../schemas/leave.schema';
 import { ApiRequestError } from '../../utils/apiClient';
@@ -46,6 +46,7 @@ export const LeaveRecords: React.FC = () => {
   const leavesQuery = useLeavesQuery();
   const employeesQuery = useEmployeesQuery({ enabled: isHrUser });
   const createLeave = useCreateLeave();
+  const deleteLeave = useDeleteLeave();
 
   const leaveList = leavesQuery.data ?? [];
   const employees = employeesQuery.data ?? [];
@@ -152,6 +153,27 @@ export const LeaveRecords: React.FC = () => {
             ? error.message
             : 'Failed to submit leave request.';
       setFormError(message);
+    }
+  };
+
+  const handleDelete = async (leave: LeaveRecord) => {
+    if (!isHrUser) return;
+
+    const confirmed = window.confirm(
+      `Delete the ${leave.type} request for ${leave.employeeName} (${leave.startDate} to ${leave.endDate})? This cannot be undone.`,
+    );
+    if (!confirmed) return;
+
+    try {
+      await deleteLeave.mutateAsync(leave.id);
+    } catch (error) {
+      const message =
+        error instanceof ApiRequestError
+          ? error.message
+          : error instanceof Error
+            ? error.message
+            : 'Failed to delete leave record.';
+      window.alert(message);
     }
   };
 
@@ -381,6 +403,19 @@ export const LeaveRecords: React.FC = () => {
                                 <span className="px-2.5 py-1 rounded-lg text-[10px] font-black uppercase bg-yellow-50 text-yellow-800 border border-yellow-150">
                                   Pending
                                 </span>
+                                <button
+                                  type="button"
+                                  onClick={() => void handleDelete(l)}
+                                  disabled={deleteLeave.isPending}
+                                  className="p-1.5 bg-gray-50 text-gray-500 hover:bg-gray-150 hover:text-red-700 rounded-lg transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                  title="Delete record"
+                                >
+                                  {deleteLeave.isPending && deleteLeave.variables === l.id ? (
+                                    <Loader2 size={13} className="animate-spin" />
+                                  ) : (
+                                    <Trash2 size={13} />
+                                  )}
+                                </button>
                               </>
                             ) : (
                               <span className="px-2.5 py-1 rounded-lg text-[10px] font-black uppercase bg-yellow-50 text-yellow-800 border border-yellow-150">
@@ -398,10 +433,16 @@ export const LeaveRecords: React.FC = () => {
                             {!isEmployeeAccount && (
                               <button
                                 type="button"
-                                className="p-1.5 bg-gray-50 text-gray-500 rounded-lg opacity-60 cursor-not-allowed"
-                                title="Delete will be available in a later update"
+                                onClick={() => void handleDelete(l)}
+                                disabled={deleteLeave.isPending}
+                                className="p-1.5 bg-gray-50 text-gray-500 hover:bg-gray-150 hover:text-red-700 rounded-lg transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                title="Delete record"
                               >
-                                <Trash2 size={13} />
+                                {deleteLeave.isPending && deleteLeave.variables === l.id ? (
+                                  <Loader2 size={13} className="animate-spin" />
+                                ) : (
+                                  <Trash2 size={13} />
+                                )}
                               </button>
                             )}
                           </div>

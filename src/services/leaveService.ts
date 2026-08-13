@@ -34,4 +34,15 @@ export const leaveService = {
 
     return response.data.record;
   },
+
+  async deleteLeave(id: string): Promise<{ id: string }> {
+    const response = await apiRequest<ApiSuccessResponse<{ id: string }>>(
+      `/leaves/${encodeURIComponent(id)}`,
+      {
+        method: 'DELETE',
+      },
+    );
+
+    return response.data;
+  },
 };
