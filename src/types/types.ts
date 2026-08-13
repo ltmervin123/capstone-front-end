@@ -166,9 +166,11 @@ export interface Applicant {
   email: string;
   phone: string;
   position: string;
+  department?: string;
   status: ApplicantStatus;
   appliedDate: string;
   resumeUrl?: string;
+  notes?: string;
 }
 
 export interface FeedbackItem {
