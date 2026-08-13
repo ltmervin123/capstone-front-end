@@ -1,9 +1,9 @@
 import React, { useState, useRef } from 'react';
 import { Save, X, RotateCcw, User, Briefcase, MapPin, GraduationCap, ClipboardCheck, Camera, Upload, Trash2, Eye, Coins, Loader2, AlertCircle } from 'lucide-react';
 import { DEPARTMENTS, type Employee } from '../../types/types';
-import { type CreateEmployeeAttachment } from '../../services/employeeService';
+import { type CreateEmployeeAttachment, type EmployeeDocumentLabel } from '../../services/employeeService';
 import { ApiRequestError } from '../../utils/apiClient';
-import { useCreateEmployee } from '../../hooks/useEmployees';
+import { useCreateEmployee, useUpdateEmployee } from '../../hooks/useEmployees';
 import { createEmployeeFormSchema } from '../../schemas/employee.schema';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -67,6 +67,7 @@ function parseMetadataLabel(value: string): string {
 
 export const EmployeeForm: React.FC<EmployeeFormProps> = ({ employee, onCancel, onSuccess, title, isReadOnly = false }) => {
   const createEmployee = useCreateEmployee();
+  const updateEmployee = useUpdateEmployee();
   const isCreateMode = !employee || (title?.startsWith('Add Employee Registration') ?? false);
 
   const initialData: EmployeeFormData = {
@@ -102,7 +103,9 @@ export const EmployeeForm: React.FC<EmployeeFormProps> = ({ employee, onCancel, 
 
   const [formData, setFormData] = useState<EmployeeFormData>(initialData);
   const [profilePictureFile, setProfilePictureFile] = useState<File | null>(null);
+  const [removeProfilePicture, setRemoveProfilePicture] = useState(false);
   const [attachmentFiles, setAttachmentFiles] = useState<Partial<Record<ChecklistCategory, Record<string, File>>>>({});
+  const [removedDocuments, setRemovedDocuments] = useState<EmployeeDocumentLabel[]>([]);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const checklistFileInputRef = useRef<HTMLInputElement>(null);
@@ -110,16 +113,11 @@ export const EmployeeForm: React.FC<EmployeeFormProps> = ({ employee, onCancel, 
   const [viewerAttachment, setViewerAttachment] = useState<{ name: string; data: string } | null>(null);
   const [showAllAttachmentsModal, setShowAllAttachmentsModal] = useState(false);
 
-  const isSubmitting = createEmployee.isPending;
+  const isSubmitting = createEmployee.isPending || updateEmployee.isPending;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitError(null);
-
-    if (!isCreateMode) {
-      setSubmitError('Employee update API is not wired yet. Use Add Employee Registration to create new records.');
-      return;
-    }
 
     const parsed = createEmployeeFormSchema.safeParse({
       employeeNumber: formData.id,
@@ -163,12 +161,30 @@ export const EmployeeForm: React.FC<EmployeeFormProps> = ({ employee, onCancel, 
       });
     });
 
+    const replacementKeys = new Set(
+      attachments.map((item) => `${item.categoryId}::${item.itemName}`),
+    );
+    const documentsToRemove = removedDocuments.filter(
+      (item) => !replacementKeys.has(`${item.categoryId}::${item.itemName}`),
+    );
+
     try {
-      await createEmployee.mutateAsync({
-        payload: parsed.data,
-        profilePicture: profilePictureFile,
-        attachments,
-      });
+      if (isCreateMode) {
+        await createEmployee.mutateAsync({
+          payload: parsed.data,
+          profilePicture: profilePictureFile,
+          attachments,
+        });
+      } else {
+        await updateEmployee.mutateAsync({
+          employeeNumber: parsed.data.employeeNumber,
+          payload: parsed.data,
+          profilePicture: profilePictureFile,
+          attachments,
+          removeProfilePicture: removeProfilePicture && !profilePictureFile,
+          removedDocuments: documentsToRemove,
+        });
+      }
       onSuccess();
     } catch (error) {
       const message =
@@ -176,7 +192,9 @@ export const EmployeeForm: React.FC<EmployeeFormProps> = ({ employee, onCancel, 
           ? error.message
           : error instanceof Error
             ? error.message
-            : 'Failed to create employee.';
+            : isCreateMode
+              ? 'Failed to create employee.'
+              : 'Failed to update employee.';
       setSubmitError(message);
     }
   };
@@ -209,6 +227,7 @@ export const EmployeeForm: React.FC<EmployeeFormProps> = ({ employee, onCancel, 
 
     const previewUrl = URL.createObjectURL(file);
     setProfilePictureFile(file);
+    setRemoveProfilePicture(false);
     setFormData((prev) => ({ ...prev, profilePicture: previewUrl }));
   };
 
@@ -228,6 +247,10 @@ export const EmployeeForm: React.FC<EmployeeFormProps> = ({ employee, onCancel, 
       }
 
       const previewUrl = URL.createObjectURL(file);
+
+      setRemovedDocuments((prev) =>
+        prev.filter((doc) => !(doc.categoryId === category && doc.itemName === item)),
+      );
 
       setAttachmentFiles((prev) => ({
         ...prev,
@@ -272,11 +295,23 @@ export const EmployeeForm: React.FC<EmployeeFormProps> = ({ employee, onCancel, 
       URL.revokeObjectURL(previousPreview);
     }
 
+    const originalStoredUrl = employee?.attachments?.[category]?.[item];
+    const hadStoredOriginal = isStoredAssetUrl(originalStoredUrl);
+
     setAttachmentFiles((prev) => {
       const nextCategory = { ...(prev[category] ?? {}) };
       delete nextCategory[item];
       return { ...prev, [category]: nextCategory };
     });
+
+    if (hadStoredOriginal) {
+      setRemovedDocuments((prev) => {
+        if (prev.some((doc) => doc.categoryId === category && doc.itemName === item)) {
+          return prev;
+        }
+        return [...prev, { categoryId: category, itemName: item }];
+      });
+    }
 
     setFormData((prev) => {
       const categoryAttachments: Record<string, string> = { ...(prev.attachments[category] ?? {}) };
@@ -444,6 +479,11 @@ export const EmployeeForm: React.FC<EmployeeFormProps> = ({ employee, onCancel, 
   const handleClear = () => {
     if (window.confirm('Clear all fields?')) {
       setFormData(initialData);
+      setProfilePictureFile(null);
+      setRemoveProfilePicture(false);
+      setAttachmentFiles({});
+      setRemovedDocuments([]);
+      setSubmitError(null);
     }
   };
 
@@ -540,6 +580,7 @@ export const EmployeeForm: React.FC<EmployeeFormProps> = ({ employee, onCancel, 
                         URL.revokeObjectURL(formData.profilePicture);
                       }
                       setProfilePictureFile(null);
+                      setRemoveProfilePicture(isStoredAssetUrl(employee?.profilePicture));
                       setFormData((p) => ({ ...p, profilePicture: '' }));
                     }}
                     className="text-[10px] font-black text-red-500 uppercase tracking-widest hover:text-red-700 transition-colors"

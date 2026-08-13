@@ -3,6 +3,7 @@ import {
   employeeService,
   type CreateEmployeeAttachment,
   type CreateEmployeePayload,
+  type EmployeeDocumentLabel,
 } from '../services/employeeService';
 
 export const EMPLOYEES_QUERY_KEY = ['employees'] as const;
@@ -23,6 +24,24 @@ export function useCreateEmployee() {
       profilePicture?: File | null;
       attachments?: CreateEmployeeAttachment[];
     }) => employeeService.createEmployee(params),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: EMPLOYEES_QUERY_KEY });
+    },
+  });
+}
+
+export function useUpdateEmployee() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (params: {
+      employeeNumber: string;
+      payload: CreateEmployeePayload;
+      profilePicture?: File | null;
+      attachments?: CreateEmployeeAttachment[];
+      removeProfilePicture?: boolean;
+      removedDocuments?: EmployeeDocumentLabel[];
+    }) => employeeService.updateEmployee(params),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: EMPLOYEES_QUERY_KEY });
     },

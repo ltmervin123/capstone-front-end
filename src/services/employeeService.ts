@@ -17,6 +17,8 @@ export interface CreateEmployeeAttachment {
   file: File;
 }
 
+export type EmployeeDocumentLabel = Omit<CreateEmployeeAttachment, 'file'>;
+
 export interface CreateEmployeePayload {
   employeeNumber: string;
   surname: string;
@@ -82,6 +84,55 @@ export const employeeService = {
       method: 'POST',
       body: formData,
     });
+
+    return response.data.employee;
+  },
+
+  async updateEmployee(params: {
+    employeeNumber: string;
+    payload: CreateEmployeePayload;
+    profilePicture?: File | null;
+    attachments?: CreateEmployeeAttachment[];
+    removeProfilePicture?: boolean;
+    removedDocuments?: EmployeeDocumentLabel[];
+  }): Promise<ApiEmployee> {
+    const formData = new FormData();
+    formData.append('payload', JSON.stringify(params.payload));
+
+    if (params.profilePicture) {
+      formData.append('profilePicture', params.profilePicture);
+    }
+
+    if (params.removeProfilePicture) {
+      formData.append('removeProfilePicture', 'true');
+    }
+
+    const attachments = params.attachments ?? [];
+    const documentLabels = attachments.map((item) => ({
+      categoryId: item.categoryId,
+      itemName: item.itemName,
+    }));
+
+    if (documentLabels.length > 0) {
+      formData.append('documentLabels', JSON.stringify(documentLabels));
+    }
+
+    for (const attachment of attachments) {
+      formData.append('documents', attachment.file);
+    }
+
+    const removedDocuments = params.removedDocuments ?? [];
+    if (removedDocuments.length > 0) {
+      formData.append('removedDocuments', JSON.stringify(removedDocuments));
+    }
+
+    const response = await apiRequest<ApiSuccessResponse<EmployeePayload>>(
+      `/employees/${encodeURIComponent(params.employeeNumber)}`,
+      {
+        method: 'PATCH',
+        body: formData,
+      },
+    );
 
     return response.data.employee;
   },
