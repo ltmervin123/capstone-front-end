@@ -1,72 +1,87 @@
-import React, { useState, useEffect } from 'react';
-import { Calendar, Search, Filter, Clock, Download, Plus, CheckCircle2, XCircle, AlertCircle } from 'lucide-react';
-import { storageService } from '../../services/storageService.ts';
+import React, { useState } from 'react';
+import { Calendar, Search, Filter, Clock, Download, Plus, CheckCircle2, XCircle, AlertCircle, Loader2 } from 'lucide-react';
 import { useCurrentUser } from '../../hooks/useAuth';
+import { useAttendanceQuery, useCreateAttendance } from '../../hooks/useAttendance';
+import { useEmployeesQuery } from '../../hooks/useEmployees';
+import { createAttendanceFormSchema } from '../../schemas/attendance.schema';
+import { ApiRequestError } from '../../utils/apiClient';
 import { Logo } from '../../assets/common/Logo.tsx';
-import { type AttendanceRecord, AttendanceStatus, type Employee } from '../../types/types.ts';
+import { Role, type AttendanceRecord, AttendanceStatus } from '../../types/types.ts';
+
+const EMPTY_ENTRY = {
+  employeeId: '',
+  date: new Date().toISOString().split('T')[0],
+  timeIn: '08:00',
+  timeOut: '17:00',
+  status: AttendanceStatus.PRESENT,
+  remarks: '',
+};
 
 export const AttendanceRecords: React.FC = () => {
   const currentUser = useCurrentUser();
-  const isEmployeeAccount = !!currentUser?.employeeId;
-  const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
-  const [employees, setEmployees] = useState<Employee[]>([]);
+  const isHrUser = currentUser?.role === Role.ADMIN || currentUser?.role === Role.HR;
+  const isEmployeeAccount = !isHrUser;
+
+  const attendanceQuery = useAttendanceQuery();
+  const employeesQuery = useEmployeesQuery({ enabled: isHrUser });
+  const createAttendance = useCreateAttendance();
+
+  const attendance = attendanceQuery.data ?? [];
+  const employees = employeesQuery.data ?? [];
+  const listLoading = attendanceQuery.isPending;
+  const listError =
+    attendanceQuery.error instanceof ApiRequestError
+      ? attendanceQuery.error.message
+      : attendanceQuery.error instanceof Error
+        ? attendanceQuery.error.message
+        : attendanceQuery.error
+          ? 'Failed to load attendance.'
+          : null;
+
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('All');
   const [showAddModal, setShowAddModal] = useState(false);
-  
-  const [newRecord, setNewRecord] = useState<Partial<AttendanceRecord>>({
-    date: new Date().toISOString().split('T')[0],
-    timeIn: '08:00',
-    timeOut: '17:00',
-    status: AttendanceStatus.PRESENT,
-    remarks: ''
-  });
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [newRecord, setNewRecord] = useState(EMPTY_ENTRY);
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  const loadData = () => {
-    setAttendance(storageService.getAttendance());
-    setEmployees(storageService.getEmployees());
-  };
-
-  const handleAddRecord = (e: React.FormEvent) => {
+  const handleAddRecord = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newRecord.employeeId) return;
+    setSubmitError(null);
 
-    const employee = employees.find(emp => emp.id === newRecord.employeeId);
-    const record: AttendanceRecord = {
-      id: `ATT-${Math.random().toString(36).substr(2, 9).toUpperCase()}`,
-      employeeId: newRecord.employeeId,
-      employeeName: employee ? `${employee.firstName} ${employee.surname}` : 'Unknown',
-      date: newRecord.date || '',
-      timeIn: newRecord.timeIn || '',
-      timeOut: newRecord.timeOut || '',
-      status: newRecord.status as AttendanceStatus || AttendanceStatus.PRESENT,
-      remarks: newRecord.remarks || ''
-    };
-
-    storageService.saveAttendance(record);
-    storageService.addLog('System', `Added attendance record for ${record.employeeName}`, `Date: ${record.date}`);
-    setShowAddModal(false);
-    loadData();
-    setNewRecord({
-      date: new Date().toISOString().split('T')[0],
-      timeIn: '08:00',
-      timeOut: '17:00',
-      status: AttendanceStatus.PRESENT,
-      remarks: ''
+    const parsed = createAttendanceFormSchema.safeParse({
+      employeeNumber: newRecord.employeeId,
+      date: newRecord.date,
+      timeIn: newRecord.timeIn,
+      timeOut: newRecord.timeOut,
+      status: newRecord.status,
+      remarks: newRecord.remarks,
     });
-  };
 
-  const filteredAttendance = attendance.filter(record => {
-    // If logged in as an employee, strictly show only their own records
-    if (currentUser?.employeeId && record.employeeId !== currentUser.employeeId) {
-      return false;
+    if (!parsed.success) {
+      setSubmitError(parsed.error.issues.map((issue) => issue.message).join(', '));
+      return;
     }
 
-    const matchesSearch = 
+    try {
+      await createAttendance.mutateAsync(parsed.data);
+      setShowAddModal(false);
+      setNewRecord({
+        ...EMPTY_ENTRY,
+        date: new Date().toISOString().split('T')[0],
+      });
+    } catch (error) {
+      const message =
+        error instanceof ApiRequestError
+          ? error.message
+          : error instanceof Error
+            ? error.message
+            : 'Failed to save attendance.';
+      setSubmitError(message);
+    }
+  };
+
+  const filteredAttendance = attendance.filter((record: AttendanceRecord) => {
+    const matchesSearch =
       record.employeeName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       record.employeeId.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesFilter = filterStatus === 'All' || record.status === filterStatus;
@@ -81,6 +96,19 @@ export const AttendanceRecords: React.FC = () => {
       case AttendanceStatus.ON_LEAVE: return 'bg-blue-100 text-blue-700 border-blue-200';
       default: return 'bg-gray-100 text-gray-700 border-gray-200';
     }
+  };
+
+  const formatAttendanceTime = (value: string | undefined) => {
+    if (!value?.trim()) return '--';
+
+    const match = value.trim().match(/^(\d{1,2}):([0-5]\d)/);
+    if (!match) return value;
+
+    const hours24 = Number(match[1]);
+    const minutes = match[2];
+    const period = hours24 >= 12 ? 'PM' : 'AM';
+    const hours12 = hours24 % 12 || 12;
+    return `${hours12}:${minutes} ${period}`;
   };
 
   const getStatusIcon = (status: AttendanceStatus) => {
@@ -100,18 +128,21 @@ export const AttendanceRecords: React.FC = () => {
           <Logo className="w-14 h-14" />
           <div>
             <h2 className="text-3xl font-black text-green-900 uppercase tracking-tighter">
-              {currentUser?.employeeId ? "My Attendance" : "Attendance Records"}
+              {isEmployeeAccount ? "My Attendance" : "Attendance Records"}
             </h2>
             <p className="text-gray-500 font-medium text-sm">
-              {currentUser?.employeeId 
+              {isEmployeeAccount 
                 ? "Your official daily clock-in/out tracking and session logs" 
                 : "Daily clock-in/out tracking and monitoring of personnel"}
             </p>
           </div>
         </div>
-        {!currentUser?.employeeId && (
+        {isHrUser && (
           <button 
-            onClick={() => setShowAddModal(true)}
+            onClick={() => {
+              setSubmitError(null);
+              setShowAddModal(true);
+            }}
             className="bg-yellow-400 hover:bg-yellow-500 text-green-950 font-black px-6 py-3 rounded-xl flex items-center gap-2 transition-all shadow-lg shadow-yellow-400/20 active:scale-95 uppercase text-xs tracking-widest"
           >
             <Plus size={18} />
@@ -121,8 +152,24 @@ export const AttendanceRecords: React.FC = () => {
       </div>
 
       <div className="bg-white rounded-[32px] p-8 shadow-sm border border-gray-100">
+        {listError && (
+          <div className="flex items-start gap-3 p-4 mb-6 bg-red-50 rounded-2xl border border-red-100 text-red-800 text-xs">
+            <AlertCircle size={18} className="shrink-0 text-red-600 mt-0.5" />
+            <div className="flex-1">
+              <span className="font-bold">Could not load attendance:</span> {listError}
+            </div>
+            <button
+              type="button"
+              onClick={() => void attendanceQuery.refetch()}
+              className="text-[10px] font-black uppercase tracking-wider text-red-700 hover:underline"
+            >
+              Retry
+            </button>
+          </div>
+        )}
+
         <div className="flex flex-col md:flex-row gap-4 mb-8">
-          {!currentUser?.employeeId && (
+          {isHrUser && (
             <div className="flex-1 relative animate-in fade-in duration-300">
               <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
               <input 
@@ -159,7 +206,7 @@ export const AttendanceRecords: React.FC = () => {
           <table className="w-full">
             <thead>
               <tr className="bg-green-900 text-yellow-400 text-left">
-                {!isEmployeeAccount && <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest rounded-tl-[24px]">Employee</th>}
+                {isHrUser && <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest rounded-tl-[24px]">Employee</th>}
                 <th className={`px-8 py-5 text-[10px] font-black uppercase tracking-widest ${isEmployeeAccount ? 'rounded-tl-[24px]' : ''}`}>Date</th>
                 <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest">Time In</th>
                 <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest">Time Out</th>
@@ -168,9 +215,19 @@ export const AttendanceRecords: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {filteredAttendance.map((record) => (
+              {listLoading && (
+                <tr>
+                  <td colSpan={isEmployeeAccount ? 5 : 6} className="px-8 py-20 text-center">
+                    <div className="flex flex-col items-center gap-3 text-green-900">
+                      <Loader2 size={32} className="animate-spin" />
+                      <p className="font-black uppercase text-xs tracking-[0.3em]">Loading attendance...</p>
+                    </div>
+                  </td>
+                </tr>
+              )}
+              {!listLoading && filteredAttendance.map((record) => (
                 <tr key={record.id} className="hover:bg-gray-50 transition-colors group">
-                  {!isEmployeeAccount && (
+                  {isHrUser && (
                     <td className="px-8 py-5">
                       <div>
                         <p className="font-black text-green-950 leading-none">{record.employeeName}</p>
@@ -180,10 +237,10 @@ export const AttendanceRecords: React.FC = () => {
                   )}
                   <td className="px-8 py-5 text-sm font-bold text-green-800">{record.date}</td>
                   <td className="px-8 py-5">
-                    <span className="font-mono text-xs font-bold text-gray-500">{record.timeIn}</span>
+                    <span className="font-mono text-xs font-bold text-gray-500">{formatAttendanceTime(record.timeIn)}</span>
                   </td>
                   <td className="px-8 py-5">
-                    <span className="font-mono text-xs font-bold text-gray-500">{record.timeOut}</span>
+                    <span className="font-mono text-xs font-bold text-gray-500">{formatAttendanceTime(record.timeOut)}</span>
                   </td>
                   <td className="px-8 py-5">
                     <span className={`px-3 py-1 rounded-full text-[10px] font-black border uppercase tracking-tighter flex items-center gap-1.5 w-fit ${getStatusColor(record.status)}`}>
@@ -194,7 +251,7 @@ export const AttendanceRecords: React.FC = () => {
                   <td className="px-8 py-5 text-xs text-gray-500 italic">{record.remarks || '--'}</td>
                 </tr>
               ))}
-              {filteredAttendance.length === 0 && (
+              {!listLoading && filteredAttendance.length === 0 && (
                 <tr>
                   <td colSpan={isEmployeeAccount ? 5 : 6} className="px-8 py-20 text-center text-gray-400">
                     <Calendar size={48} className="mx-auto mb-4 opacity-20" />
@@ -213,7 +270,16 @@ export const AttendanceRecords: React.FC = () => {
             <h3 className="text-2xl font-black text-green-900 mb-2 uppercase tracking-tighter">Manual Attendance Entry</h3>
             <p className="text-gray-500 text-sm font-medium mb-8">Override or add missing attendance logs</p>
             
-            <form onSubmit={handleAddRecord} className="space-y-6">
+            <form onSubmit={(e) => void handleAddRecord(e)} className="space-y-6">
+              {submitError && (
+                <div className="flex items-start gap-3 p-4 bg-red-50 rounded-2xl border border-red-100 text-red-800 text-xs">
+                  <AlertCircle size={18} className="shrink-0 text-red-600 mt-0.5" />
+                  <div>
+                    <span className="font-bold">Could not save attendance:</span> {submitError}
+                  </div>
+                </div>
+              )}
+
               <div>
                 <label className="text-[10px] font-black text-yellow-900 uppercase tracking-widest mb-2 block">Employee</label>
                 <select 
@@ -288,15 +354,18 @@ export const AttendanceRecords: React.FC = () => {
                 <button 
                   type="button"
                   onClick={() => setShowAddModal(false)}
-                  className="flex-1 px-6 py-4 bg-gray-100 text-gray-500 font-black rounded-2xl hover:bg-gray-200 transition-colors uppercase text-xs tracking-widest"
+                  disabled={createAttendance.isPending}
+                  className="flex-1 px-6 py-4 bg-gray-100 text-gray-500 font-black rounded-2xl hover:bg-gray-200 transition-colors uppercase text-xs tracking-widest disabled:opacity-50"
                 >
                   Cancel
                 </button>
                 <button 
                   type="submit"
-                  className="flex-1 px-6 py-4 bg-green-900 text-yellow-400 font-black rounded-2xl hover:bg-green-800 transition-all active:scale-95 uppercase text-xs tracking-widest"
+                  disabled={createAttendance.isPending}
+                  className="flex-1 px-6 py-4 bg-green-900 text-yellow-400 font-black rounded-2xl hover:bg-green-800 transition-all active:scale-95 uppercase text-xs tracking-widest disabled:opacity-60 flex items-center justify-center gap-2"
                 >
-                  Save Entry
+                  {createAttendance.isPending ? <Loader2 size={16} className="animate-spin" /> : null}
+                  {createAttendance.isPending ? 'Saving...' : 'Save Entry'}
                 </button>
               </div>
             </form>

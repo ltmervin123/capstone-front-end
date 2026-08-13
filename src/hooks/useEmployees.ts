@@ -8,10 +8,11 @@ import {
 
 export const EMPLOYEES_QUERY_KEY = ['employees'] as const;
 
-export function useEmployeesQuery() {
+export function useEmployeesQuery(options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: EMPLOYEES_QUERY_KEY,
     queryFn: () => employeeService.listEmployees(),
+    enabled: options?.enabled ?? true,
   });
 }
 
