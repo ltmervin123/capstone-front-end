@@ -45,4 +45,15 @@ export const leaveService = {
 
     return response.data;
   },
+
+  async rejectLeave(id: string): Promise<LeaveRecord> {
+    const response = await apiRequest<ApiSuccessResponse<LeavePayload>>(
+      `/leaves/${encodeURIComponent(id)}/reject`,
+      {
+        method: 'PATCH',
+      },
+    );
+
+    return response.data.record;
+  },
 };

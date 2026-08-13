@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { CalendarDays, Check, X, Clock, Plus, FileText, Trash2, AlertCircle, Loader2 } from 'lucide-react';
 import { useCurrentUser } from '../../hooks/useAuth';
-import { useCreateLeave, useDeleteLeave, useLeavesQuery } from '../../hooks/useLeaves';
+import { useCreateLeave, useDeleteLeave, useLeavesQuery, useRejectLeave } from '../../hooks/useLeaves';
 import { useEmployeesQuery } from '../../hooks/useEmployees';
 import { createLeaveFormSchema } from '../../schemas/leave.schema';
 import { ApiRequestError } from '../../utils/apiClient';
@@ -47,6 +47,7 @@ export const LeaveRecords: React.FC = () => {
   const employeesQuery = useEmployeesQuery({ enabled: isHrUser });
   const createLeave = useCreateLeave();
   const deleteLeave = useDeleteLeave();
+  const rejectLeave = useRejectLeave();
 
   const leaveList = leavesQuery.data ?? [];
   const employees = employeesQuery.data ?? [];
@@ -173,6 +174,27 @@ export const LeaveRecords: React.FC = () => {
           : error instanceof Error
             ? error.message
             : 'Failed to delete leave record.';
+      window.alert(message);
+    }
+  };
+
+  const handleReject = async (leave: LeaveRecord) => {
+    if (!isHrUser) return;
+
+    const confirmed = window.confirm(
+      `Reject the ${leave.type} request for ${leave.employeeName} (${leave.startDate} to ${leave.endDate})?`,
+    );
+    if (!confirmed) return;
+
+    try {
+      await rejectLeave.mutateAsync(leave.id);
+    } catch (error) {
+      const message =
+        error instanceof ApiRequestError
+          ? error.message
+          : error instanceof Error
+            ? error.message
+            : 'Failed to reject leave request.';
       window.alert(message);
     }
   };
@@ -395,10 +417,16 @@ export const LeaveRecords: React.FC = () => {
                                 </button>
                                 <button
                                   type="button"
-                                  className="p-1.5 bg-rose-50 text-red-700 rounded-lg opacity-60 cursor-not-allowed"
-                                  title="Reject will be available in a later update"
+                                  onClick={() => void handleReject(l)}
+                                  disabled={rejectLeave.isPending || deleteLeave.isPending}
+                                  className="p-1.5 bg-rose-50 text-red-700 hover:bg-red-600 hover:text-white rounded-lg transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                  title="Reject request"
                                 >
-                                  <X size={14} className="stroke-[3]" />
+                                  {rejectLeave.isPending && rejectLeave.variables === l.id ? (
+                                    <Loader2 size={14} className="animate-spin" />
+                                  ) : (
+                                    <X size={14} className="stroke-[3]" />
+                                  )}
                                 </button>
                                 <span className="px-2.5 py-1 rounded-lg text-[10px] font-black uppercase bg-yellow-50 text-yellow-800 border border-yellow-150">
                                   Pending
