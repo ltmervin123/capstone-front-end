@@ -1,36 +1,67 @@
 import React, { useState } from 'react';
-import { CalendarDays, Check, X, Clock, Plus, FileText, Trash2, AlertCircle } from 'lucide-react';
-import { storageService } from '../../services/storageService';
+import { CalendarDays, Check, X, Clock, Plus, FileText, Trash2, AlertCircle, Loader2 } from 'lucide-react';
 import { useCurrentUser } from '../../hooks/useAuth';
+import { useCreateLeave, useLeavesQuery } from '../../hooks/useLeaves';
+import { useEmployeesQuery } from '../../hooks/useEmployees';
+import { createLeaveFormSchema } from '../../schemas/leave.schema';
+import { ApiRequestError } from '../../utils/apiClient';
 import { Logo } from '../../assets/common/Logo.tsx';
-import { type LeaveRecord, LeaveType } from '../../types/types';
+import { Role, LeaveType, type LeaveRecord } from '../../types/types';
 import { motion, AnimatePresence } from 'motion/react';
+
+const TOTAL_LEAVE_LIMIT = 15;
+
+function leaveDays(leave: LeaveRecord) {
+  if (leave.numberOfDays > 0) return leave.numberOfDays;
+  if (!leave.startDate || !leave.endDate) return 1;
+  const start = new Date(leave.startDate);
+  const end = new Date(leave.endDate);
+  const diff = Math.ceil(Math.abs(end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+  return Number.isNaN(diff) ? 1 : diff;
+}
+
+function leaveTypeBadgeClass(type: LeaveType) {
+  switch (type) {
+    case LeaveType.LEAVE_CREDITS:
+      return 'bg-green-50 text-green-850';
+    case LeaveType.MATERNITY:
+    case LeaveType.VAWC:
+      return 'bg-rose-50 text-rose-850';
+    case LeaveType.PATERNITY:
+    case LeaveType.SOLO_PARENT:
+      return 'bg-blue-50 text-blue-850';
+    case LeaveType.STUDY:
+    case LeaveType.SPECIAL:
+      return 'bg-purple-50 text-purple-850';
+    default:
+      return 'bg-amber-50 text-amber-850';
+  }
+}
 
 export const LeaveRecords: React.FC = () => {
   const currentUser = useCurrentUser();
-  const [employees] = useState(() => storageService.getEmployees());
+  const isHrUser = currentUser?.role === Role.ADMIN || currentUser?.role === Role.HR;
+  const isEmployeeAccount = !isHrUser;
 
-  // Check if current user is an employee account
-  const isEmployeeAccount = !!currentUser?.employeeId;
+  const leavesQuery = useLeavesQuery();
+  const employeesQuery = useEmployeesQuery({ enabled: isHrUser });
+  const createLeave = useCreateLeave();
 
-  // Compute filtered leaves list
-  const getFilteredLeaves = () => {
-    const raw = storageService.getLeaves();
-    if (isEmployeeAccount && currentUser?.employeeId) {
-      return raw.filter(l => l.employeeId === currentUser.employeeId);
-    }
-    return raw;
-  };
+  const leaveList = leavesQuery.data ?? [];
+  const employees = employeesQuery.data ?? [];
+  const listLoading = leavesQuery.isPending;
+  const listError =
+    leavesQuery.error instanceof ApiRequestError
+      ? leavesQuery.error.message
+      : leavesQuery.error instanceof Error
+        ? leavesQuery.error.message
+        : leavesQuery.error
+          ? 'Failed to load leave records.'
+          : null;
 
-  const [leaveList, setLeaveList] = useState<LeaveRecord[]>(() => getFilteredLeaves());
-
-  // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
-  
-  // Form fields
   const [selectedEmpId, setSelectedEmpId] = useState('');
-  const [customEmpName, setCustomEmpName] = useState('');
-  const [leaveType, setLeaveType] = useState<string>('Sick');
+  const [leaveType, setLeaveType] = useState<LeaveType>(LeaveType.LEAVE_CREDITS);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [reason, setReason] = useState('');
@@ -39,105 +70,9 @@ export const LeaveRecords: React.FC = () => {
   const [timeTo, setTimeTo] = useState('');
   const [customDays, setCustomDays] = useState<number | null>(null);
 
-  const handleApprove = (leave: LeaveRecord) => {
-    if (isEmployeeAccount) return;
-    const updated: LeaveRecord = { ...leave, status: 'Approved' };
-    storageService.saveLeave(updated);
-    setLeaveList(getFilteredLeaves());
-    storageService.addLog(currentUser?.username || 'System', `Approved leave request`, `ID: ${leave.id} for ${leave.employeeName}`);
-  };
-
-  const handleReject = (leave: LeaveRecord) => {
-    if (isEmployeeAccount) return;
-    const updated: LeaveRecord = { ...leave, status: 'Rejected' };
-    storageService.saveLeave(updated);
-    setLeaveList(getFilteredLeaves());
-    storageService.addLog(currentUser?.username || 'System', `Rejected leave request`, `ID: ${leave.id} for ${leave.employeeName}`);
-  };
-
-  const handleDelete = (id: string) => {
-    if (isEmployeeAccount) return;
-    if (window.confirm('Are you sure you want to delete this leave record?')) {
-      storageService.deleteLeave(id);
-      setLeaveList(getFilteredLeaves());
-    }
-  };
-
-  const handleFileLeave = (e: React.FormEvent) => {
-    e.preventDefault();
-    setFormError(null);
-
-    if (!startDate || !endDate) {
-      setFormError('Please select both start and end dates.');
-      return;
-    }
-
-    if (new Date(startDate) > new Date(endDate)) {
-      setFormError('Start date cannot be after the end date.');
-      return;
-    }
-
-    const requestedDays = calculateDays();
-    if (requestedDays > remainingLeaveCredits) {
-      setFormError(`Leave Limit Reached: You are requesting ${requestedDays} day(s), but only have ${remainingLeaveCredits} leave credit(s) remaining for this year.`);
-      return;
-    }
-
-    if (!reason.trim()) {
-      setFormError('Please enter a valid reason for the leave.');
-      return;
-    }
-
-    let empName = '';
-    let empId = '';
-
-    if (isEmployeeAccount) {
-      // Pre-fill with the actual logged-in employee record details
-      const emp = employees.find(e => e.id === currentUser?.employeeId);
-      empName = emp ? `${emp.firstName} ${emp.surname}` : 'Juan Dela Cruz';
-      empId = currentUser?.employeeId || 'EMP001';
-    } else {
-      if (selectedEmpId === 'custom') {
-        if (!customEmpName.trim()) {
-          setFormError('Please enter the custom employee name.');
-          return;
-        }
-        empName = customEmpName.trim();
-        empId = 'EMP-CUSTOM';
-      } else {
-        const emp = employees.find(e => e.id === selectedEmpId);
-        if (!emp) {
-          setFormError('Please select an employee.');
-          return;
-        }
-        empName = `${emp.firstName} ${emp.surname}`;
-        empId = emp.id;
-      }
-    }
-
-    let finalReason = reason.trim();
-    if (timeFrom || timeTo) {
-      finalReason += ` (Time: ${timeFrom || 'N/A'} to ${timeTo || 'N/A'})`;
-    }
-
-    const newLeave: LeaveRecord = {
-      id: 'LV-' + Math.random().toString(36).substr(2, 9).toUpperCase(),
-      employeeId: empId,
-      employeeName: empName,
-      type: leaveType,
-      startDate,
-      endDate,
-      status: 'Pending',
-      reason: finalReason
-    };
-
-    storageService.saveLeave(newLeave);
-    setLeaveList(getFilteredLeaves());
-    
-    // Reset Form & Close
-    setIsModalOpen(false);
+  const resetForm = () => {
     setSelectedEmpId('');
-    setCustomEmpName('');
+    setLeaveType(LeaveType.LEAVE_CREDITS);
     setStartDate('');
     setEndDate('');
     setReason('');
@@ -147,53 +82,98 @@ export const LeaveRecords: React.FC = () => {
     setFormError(null);
   };
 
-  let empName = '';
-  let empDept = '';
-  let empId = '';
-
-  if (isEmployeeAccount) {
-    const emp = employees.find(e => e.id === currentUser?.employeeId);
-    empName = emp ? `${emp.firstName} ${emp.surname}` : 'Juan Dela Cruz';
-    empDept = emp ? `${emp.position} / ${emp.department}` : 'Instructor / Computer Dept';
-    empId = currentUser?.employeeId || 'EMP001';
-  } else {
-    if (selectedEmpId === 'custom') {
-      empName = customEmpName || '';
-      empDept = 'N/A';
-      empId = 'EMP-CUSTOM';
-    } else {
-      const emp = employees.find(e => e.id === selectedEmpId);
-      if (emp) {
-        empName = `${emp.firstName} ${emp.surname}`;
-        empDept = `${emp.position} / ${emp.department}`;
-        empId = emp.id;
-      }
-    }
-  }
-
   const calculateDays = () => {
     if (!startDate || !endDate) return 0;
-    const s = new Date(startDate);
-    const e = new Date(endDate);
-    const diffTime = Math.abs(e.getTime() - s.getTime());
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const diffTime = Math.abs(end.getTime() - start.getTime());
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
-    return isNaN(diffDays) ? 0 : diffDays;
+    return Number.isNaN(diffDays) ? 0 : diffDays;
   };
 
-  const TOTAL_LEAVE_LIMIT = 15;
-  const myApprovedLeaves = leaveList.filter(l => l.status === 'Approved');
-  const myPendingLeaves = leaveList.filter(l => l.status === 'Pending');
+  const requestedDays = customDays || calculateDays();
 
-  const getDaysBetween = (sDate: string, eDate: string) => {
-    if (!sDate || !eDate) return 1;
-    const s = new Date(sDate);
-    const e = new Date(eDate);
-    const diff = Math.ceil(Math.abs(e.getTime() - s.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-    return isNaN(diff) ? 1 : diff;
+  const currentYear = new Date().getFullYear();
+  const creditEmployeeId = isEmployeeAccount ? currentUser?.employeeId : selectedEmpId;
+  const formCreditLeaves = leaveList.filter((leave) => {
+    if (leave.type !== LeaveType.LEAVE_CREDITS) return false;
+    if (creditEmployeeId && leave.employeeId !== creditEmployeeId) return false;
+    return leave.startDate.slice(0, 4) === String(currentYear);
+  });
+  const formApprovedDays = formCreditLeaves
+    .filter((leave) => leave.status === 'Approved')
+    .reduce((sum, leave) => sum + leaveDays(leave), 0);
+  const formRemainingCredits = creditEmployeeId
+    ? Math.max(0, TOTAL_LEAVE_LIMIT - formApprovedDays)
+    : TOTAL_LEAVE_LIMIT;
+
+  const handleFileLeave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setFormError(null);
+
+    const employeeNumber = isEmployeeAccount ? currentUser?.employeeId ?? '' : selectedEmpId;
+
+    if (isEmployeeAccount && !employeeNumber) {
+      setFormError('Your account is not linked to an employee record.');
+      return;
+    }
+    const parsed = createLeaveFormSchema.safeParse({
+      employeeNumber,
+      type: leaveType,
+      startDate,
+      endDate,
+      numberOfDays: requestedDays,
+      timeFrom,
+      timeTo,
+      reason,
+    });
+
+    if (!parsed.success) {
+      setFormError(parsed.error.issues.map((issue) => issue.message).join(', '));
+      return;
+    }
+
+    if (parsed.data.type === LeaveType.LEAVE_CREDITS && parsed.data.numberOfDays > formRemainingCredits) {
+      setFormError(
+        `Leave Limit Reached: You are requesting ${parsed.data.numberOfDays} day(s), but only have ${formRemainingCredits} leave credit(s) remaining for this year.`,
+      );
+      return;
+    }
+
+    try {
+      await createLeave.mutateAsync(parsed.data);
+      setIsModalOpen(false);
+      resetForm();
+    } catch (error) {
+      const message =
+        error instanceof ApiRequestError
+          ? error.message
+          : error instanceof Error
+            ? error.message
+            : 'Failed to submit leave request.';
+      setFormError(message);
+    }
   };
 
-  const totalApprovedDays = myApprovedLeaves.reduce((sum, l) => sum + getDaysBetween(l.startDate, l.endDate), 0);
-  const totalPendingDays = myPendingLeaves.reduce((sum, l) => sum + getDaysBetween(l.startDate, l.endDate), 0);
+  const selectedEmployee = employees.find((employee) => employee.id === selectedEmpId);
+  const ownLeave = leaveList.find((leave) => leave.employeeId === currentUser?.employeeId);
+
+  let empName = '';
+  let empDept = '';
+
+  if (isEmployeeAccount) {
+    empName = ownLeave?.employeeName || currentUser?.username || '';
+    const deptParts = [ownLeave?.employeePosition, ownLeave?.employeeDepartment].filter(Boolean);
+    empDept = deptParts.length > 0 ? deptParts.join(' / ') : 'N/A';
+  } else if (selectedEmployee) {
+    empName = `${selectedEmployee.firstName} ${selectedEmployee.surname}`;
+    empDept = `${selectedEmployee.position} / ${selectedEmployee.department}`;
+  }
+
+  const myApprovedLeaves = leaveList.filter((leave) => leave.status === 'Approved');
+  const myPendingLeaves = leaveList.filter((leave) => leave.status === 'Pending');
+  const totalApprovedDays = myApprovedLeaves.reduce((sum, leave) => sum + leaveDays(leave), 0);
+  const totalPendingDays = myPendingLeaves.reduce((sum, leave) => sum + leaveDays(leave), 0);
   const remainingLeaveCredits = Math.max(0, TOTAL_LEAVE_LIMIT - totalApprovedDays);
 
   return (
@@ -219,10 +199,7 @@ export const LeaveRecords: React.FC = () => {
         <div>
           <button
             onClick={() => {
-              if (isEmployeeAccount) {
-                // Pre-fill fields for the employee
-                setSelectedEmpId('emp-user-1');
-              }
+              setFormError(null);
               setIsModalOpen(true);
             }}
             className="w-full md:w-auto px-5 py-3 bg-green-900 hover:bg-green-800 text-yellow-400 rounded-2xl font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-md hover:shadow-lg active:scale-95 cursor-pointer"
@@ -314,6 +291,21 @@ export const LeaveRecords: React.FC = () => {
       </div>
 
       <div className="bg-white rounded-3xl border border-gray-100 shadow-xl overflow-hidden">
+        {listError && (
+          <div className="flex items-start gap-3 p-4 m-4 mb-0 bg-red-50 rounded-2xl border border-red-100 text-red-800 text-xs">
+            <AlertCircle size={18} className="shrink-0 text-red-600 mt-0.5" />
+            <div className="flex-1">
+              <span className="font-bold">Could not load leave records:</span> {listError}
+            </div>
+            <button
+              type="button"
+              onClick={() => void leavesQuery.refetch()}
+              className="text-[10px] font-black uppercase tracking-wider text-red-700 hover:underline"
+            >
+              Retry
+            </button>
+          </div>
+        )}
         <div className="overflow-x-auto">
           <table className="w-full text-left">
             <thead>
@@ -326,22 +318,27 @@ export const LeaveRecords: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {leaveList.length === 0 ? (
+              {listLoading && (
+                <tr>
+                  <td colSpan={isEmployeeAccount ? 4 : 5} className="text-center py-16">
+                    <div className="flex flex-col items-center gap-3 text-green-900">
+                      <Loader2 size={28} className="animate-spin" />
+                      <p className="font-black uppercase text-xs tracking-[0.3em]">Loading leave records...</p>
+                    </div>
+                  </td>
+                </tr>
+              )}
+              {!listLoading && leaveList.length === 0 ? (
                 <tr>
                   <td colSpan={isEmployeeAccount ? 4 : 5} className="text-center py-8 text-sm font-medium text-gray-500 italic">
                     No leave requests found. Click "File Leave Form" to file your first request.
                   </td>
                 </tr>
               ) : (
-                leaveList.map((l) => (
+                !listLoading && leaveList.map((l) => (
                   <tr key={l.id} className="hover:bg-green-50/20 transition-colors">
                     <td className="px-6 py-4">
-                      <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase ${
-                        l.type === LeaveType.SICK || l.type === 'Sick' ? 'bg-red-50 text-red-850' :
-                        l.type === LeaveType.VACATION || l.type === 'Vacation' ? 'bg-blue-50 text-blue-850' :
-                        l.type === LeaveType.EMERGENCY || l.type === 'Emergency' ? 'bg-amber-50 text-amber-850' :
-                        'bg-purple-50 text-purple-850'
-                      }`}>
+                      <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase ${leaveTypeBadgeClass(l.type)}`}>
                         {l.type}
                       </span>
                     </td>
@@ -355,6 +352,7 @@ export const LeaveRecords: React.FC = () => {
                       <div className="flex items-center gap-1.5 text-xs font-bold text-gray-600">
                         <Clock size={12} className="text-green-800" />
                         <span>{l.startDate} to {l.endDate}</span>
+                        <span className="text-[10px] text-gray-400 font-black">({l.numberOfDays}d)</span>
                       </div>
                     </td>
                     <td className="px-6 py-4 max-w-xs truncate">
@@ -366,20 +364,23 @@ export const LeaveRecords: React.FC = () => {
                           <>
                             {!isEmployeeAccount ? (
                               <>
-                                <button 
-                                  onClick={() => handleApprove(l)}
-                                  className="p-1.5 bg-green-50 text-green-800 hover:bg-green-600 hover:text-white rounded-lg transition-all cursor-pointer"
-                                  title="Approve request"
+                                <button
+                                  type="button"
+                                  className="p-1.5 bg-green-50 text-green-800 rounded-lg opacity-60 cursor-not-allowed"
+                                  title="Approve will be available in a later update"
                                 >
                                   <Check size={14} className="stroke-[3]" />
                                 </button>
-                                <button 
-                                  onClick={() => handleReject(l)}
-                                  className="p-1.5 bg-rose-50 text-red-700 hover:bg-red-600 hover:text-white rounded-lg transition-all cursor-pointer"
-                                  title="Reject request"
+                                <button
+                                  type="button"
+                                  className="p-1.5 bg-rose-50 text-red-700 rounded-lg opacity-60 cursor-not-allowed"
+                                  title="Reject will be available in a later update"
                                 >
                                   <X size={14} className="stroke-[3]" />
                                 </button>
+                                <span className="px-2.5 py-1 rounded-lg text-[10px] font-black uppercase bg-yellow-50 text-yellow-800 border border-yellow-150">
+                                  Pending
+                                </span>
                               </>
                             ) : (
                               <span className="px-2.5 py-1 rounded-lg text-[10px] font-black uppercase bg-yellow-50 text-yellow-800 border border-yellow-150">
@@ -395,10 +396,10 @@ export const LeaveRecords: React.FC = () => {
                               {l.status}
                             </span>
                             {!isEmployeeAccount && (
-                              <button 
-                                onClick={() => handleDelete(l.id)}
-                                className="p-1.5 bg-gray-50 text-gray-500 hover:bg-gray-150 hover:text-red-700 rounded-lg transition-all cursor-pointer"
-                                title="Delete record"
+                              <button
+                                type="button"
+                                className="p-1.5 bg-gray-50 text-gray-500 rounded-lg opacity-60 cursor-not-allowed"
+                                title="Delete will be available in a later update"
                               >
                                 <Trash2 size={13} />
                               </button>
@@ -446,7 +447,7 @@ export const LeaveRecords: React.FC = () => {
               </div>
 
               {/* Form Body - Document Form */}
-              <form onSubmit={handleFileLeave} className="p-8 space-y-6 overflow-y-auto max-h-[80vh]">
+              <form onSubmit={(e) => void handleFileLeave(e)} className="p-8 space-y-6 overflow-y-auto max-h-[80vh]">
                 {formError && (
                   <div className="p-4 bg-rose-50 border border-rose-100 text-rose-800 text-xs rounded-2xl font-bold flex items-center gap-2">
                     <AlertCircle size={16} className="shrink-0" />
@@ -462,7 +463,7 @@ export const LeaveRecords: React.FC = () => {
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="font-mono font-black text-green-900 bg-white px-3 py-1 rounded-xl border border-green-200 shadow-2xs">
-                      {remainingLeaveCredits}.0 Days Left
+                      {formRemainingCredits}.0 Days Left
                     </span>
                     <span className="text-[10px] text-gray-500 font-bold uppercase">(Max 15.0 Days/Year Limit)</span>
                   </div>
@@ -538,28 +539,16 @@ export const LeaveRecords: React.FC = () => {
                           <select
                             required
                             value={selectedEmpId}
-                            onChange={(e) => {
-                              setSelectedEmpId(e.target.value);
-                              setCustomEmpName('');
-                            }}
+                            onChange={(e) => setSelectedEmpId(e.target.value)}
                             className="bg-white border border-green-900/20 rounded-lg py-1 px-2 font-black text-[11px] text-green-950 outline-none focus:ring-2 focus:ring-green-900"
                           >
                             <option value="">-- Choose Employee --</option>
-                            {employees.map(e => (
-                              <option key={e.id} value={e.id}>{e.firstName} {e.surname} ({e.id})</option>
+                            {employees.map((employee) => (
+                              <option key={employee.id} value={employee.id}>
+                                {employee.firstName} {employee.surname} ({employee.id})
+                              </option>
                             ))}
-                            <option value="custom">-- Enter Custom Name --</option>
                           </select>
-                          {selectedEmpId === 'custom' && (
-                            <input
-                              type="text"
-                              required
-                              placeholder="Type complete name"
-                              value={customEmpName}
-                              onChange={(e) => setCustomEmpName(e.target.value)}
-                              className="bg-white border border-green-900/20 rounded-lg py-1 px-2 font-black text-[11px] text-green-950 outline-none focus:ring-2 focus:ring-green-900"
-                            />
-                          )}
                         </div>
                       )}
                     </div>
@@ -592,7 +581,7 @@ export const LeaveRecords: React.FC = () => {
                       
                       {/* Leave Credits */}
                       <div 
-                        onClick={() => setLeaveType('Leave Credits')}
+                        onClick={() => setLeaveType(LeaveType.LEAVE_CREDITS)}
                         className="flex items-center gap-2.5 cursor-pointer group"
                       >
                         <div className={`w-4.5 h-4.5 rounded border border-green-900 flex items-center justify-center font-black transition-all ${leaveType === 'Leave Credits' ? 'bg-green-900 text-yellow-400' : 'bg-white text-transparent group-hover:text-gray-300'}`}>
@@ -609,7 +598,7 @@ export const LeaveRecords: React.FC = () => {
                         <div className="space-y-2.5">
                           {/* Maternity Leave */}
                           <div 
-                            onClick={() => setLeaveType('Maternity Leave')}
+                            onClick={() => setLeaveType(LeaveType.MATERNITY)}
                             className="flex items-center gap-2.5 cursor-pointer group"
                           >
                             <div className={`w-4.5 h-4.5 rounded border border-green-900 flex items-center justify-center font-black transition-all ${leaveType === 'Maternity Leave' ? 'bg-green-900 text-yellow-400' : 'bg-white text-transparent group-hover:text-gray-300'}`}>
@@ -622,7 +611,7 @@ export const LeaveRecords: React.FC = () => {
 
                           {/* Leave for Victims of VAW-C */}
                           <div 
-                            onClick={() => setLeaveType('Leave for Victims of VAW-C')}
+                            onClick={() => setLeaveType(LeaveType.VAWC)}
                             className="flex items-center gap-2.5 cursor-pointer group"
                           >
                             <div className={`w-4.5 h-4.5 rounded border border-green-900 flex items-center justify-center font-black transition-all ${leaveType === 'Leave for Victims of VAW-C' ? 'bg-green-900 text-yellow-400' : 'bg-white text-transparent group-hover:text-gray-300'}`}>
@@ -638,7 +627,7 @@ export const LeaveRecords: React.FC = () => {
                       <div className="space-y-3 pt-2 border-t border-dotted border-green-900/20">
                         {/* Paternity Leave */}
                         <div 
-                          onClick={() => setLeaveType('Paternity Leave')}
+                          onClick={() => setLeaveType(LeaveType.PATERNITY)}
                           className="flex items-center gap-2.5 cursor-pointer group"
                         >
                           <div className={`w-4.5 h-4.5 rounded border border-green-900 flex items-center justify-center font-black transition-all ${leaveType === 'Paternity Leave' ? 'bg-green-900 text-yellow-400' : 'bg-white text-transparent group-hover:text-gray-300'}`}>
@@ -651,7 +640,7 @@ export const LeaveRecords: React.FC = () => {
 
                         {/* Solo Parents Leave */}
                         <div 
-                          onClick={() => setLeaveType('Solo Parents Leave')}
+                          onClick={() => setLeaveType(LeaveType.SOLO_PARENT)}
                           className="flex items-center gap-2.5 cursor-pointer group"
                         >
                           <div className={`w-4.5 h-4.5 rounded border border-green-900 flex items-center justify-center font-black transition-all ${leaveType === 'Solo Parents Leave' ? 'bg-green-900 text-yellow-400' : 'bg-white text-transparent group-hover:text-gray-300'}`}>
@@ -664,7 +653,7 @@ export const LeaveRecords: React.FC = () => {
 
                         {/* Study Leave */}
                         <div 
-                          onClick={() => setLeaveType('Study Leave')}
+                          onClick={() => setLeaveType(LeaveType.STUDY)}
                           className="flex items-center gap-2.5 cursor-pointer group"
                         >
                           <div className={`w-4.5 h-4.5 rounded border border-green-900 flex items-center justify-center font-black transition-all ${leaveType === 'Study Leave' ? 'bg-green-900 text-yellow-400' : 'bg-white text-transparent group-hover:text-gray-300'}`}>
@@ -683,7 +672,7 @@ export const LeaveRecords: React.FC = () => {
 
                       {/* Special Leave */}
                       <div 
-                        onClick={() => setLeaveType('Special Leave')}
+                        onClick={() => setLeaveType(LeaveType.SPECIAL)}
                         className="flex items-center gap-2.5 cursor-pointer group"
                       >
                         <div className={`w-4.5 h-4.5 rounded border border-green-900 flex items-center justify-center font-black transition-all ${leaveType === 'Special Leave' ? 'bg-green-900 text-yellow-400' : 'bg-white text-transparent group-hover:text-gray-300'}`}>
@@ -696,7 +685,7 @@ export const LeaveRecords: React.FC = () => {
 
                       {/* Authorized Absence */}
                       <div 
-                        onClick={() => setLeaveType('Authorized Absence')}
+                        onClick={() => setLeaveType(LeaveType.AUTHORIZED_ABSENCE)}
                         className="flex items-center gap-2.5 cursor-pointer group"
                       >
                         <div className={`w-4.5 h-4.5 rounded border border-green-900 flex items-center justify-center font-black transition-all ${leaveType === 'Authorized Absence' ? 'bg-green-900 text-yellow-400' : 'bg-white text-transparent group-hover:text-gray-300'}`}>
@@ -709,7 +698,7 @@ export const LeaveRecords: React.FC = () => {
 
                       {/* Authorized Undertime */}
                       <div 
-                        onClick={() => setLeaveType('Authorized Undertime')}
+                        onClick={() => setLeaveType(LeaveType.AUTHORIZED_UNDERTIME)}
                         className="flex items-center gap-2.5 cursor-pointer group"
                       >
                         <div className={`w-4.5 h-4.5 rounded border border-green-900 flex items-center justify-center font-black transition-all ${leaveType === 'Authorized Undertime' ? 'bg-green-900 text-yellow-400' : 'bg-white text-transparent group-hover:text-gray-300'}`}>
@@ -860,7 +849,7 @@ export const LeaveRecords: React.FC = () => {
                       <div className="flex items-center gap-2">
                         <span className="text-[8.5px] text-green-900 uppercase font-black tracking-widest font-mono">Available Leave Credits:</span>
                         <span className="font-mono font-black border border-amber-200 bg-amber-50 text-amber-900 px-4 rounded-lg py-1.5 text-xs shadow-xs">
-                          15.0 Days
+                          {formRemainingCredits}.0 Days
                         </span>
                       </div>
                     </div>
@@ -875,15 +864,18 @@ export const LeaveRecords: React.FC = () => {
                       setIsModalOpen(false);
                       setFormError(null);
                     }}
-                    className="px-5 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-2xl transition-all cursor-pointer active:scale-95"
+                    disabled={createLeave.isPending}
+                    className="px-5 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-2xl transition-all cursor-pointer active:scale-95 disabled:opacity-50"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
-                    className="px-6 py-3.5 bg-green-900 hover:bg-green-800 text-yellow-400 rounded-2xl transition-all shadow-md active:scale-95 cursor-pointer"
+                    disabled={createLeave.isPending}
+                    className="px-6 py-3.5 bg-green-900 hover:bg-green-800 text-yellow-400 rounded-2xl transition-all shadow-md active:scale-95 cursor-pointer disabled:opacity-60 flex items-center gap-2"
                   >
-                    Submit Application
+                    {createLeave.isPending ? <Loader2 size={14} className="animate-spin" /> : null}
+                    {createLeave.isPending ? 'Submitting...' : 'Submit Application'}
                   </button>
                 </div>
               </form>

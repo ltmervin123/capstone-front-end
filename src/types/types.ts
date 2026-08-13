@@ -107,22 +107,32 @@ export interface PayrollRecord {
   otherDeductions: number; // Other arbitrary deductions
 }
 
+export enum LeaveType {
+  LEAVE_CREDITS = 'Leave Credits',
+  MATERNITY = 'Maternity Leave',
+  VAWC = 'Leave for Victims of VAW-C',
+  PATERNITY = 'Paternity Leave',
+  SOLO_PARENT = 'Solo Parents Leave',
+  STUDY = 'Study Leave',
+  SPECIAL = 'Special Leave',
+  AUTHORIZED_ABSENCE = 'Authorized Absence',
+  AUTHORIZED_UNDERTIME = 'Authorized Undertime',
+}
+
 export interface LeaveRecord {
   id: string;
   employeeId: string;
   employeeName: string;
-  type: string;
+  employeePosition?: string;
+  employeeDepartment?: string;
+  type: LeaveType;
   startDate: string;
   endDate: string;
+  numberOfDays: number;
+  timeFrom?: string;
+  timeTo?: string;
   status: 'Approved' | 'Pending' | 'Rejected';
   reason: string;
-}
-
-export enum LeaveType {
-  SICK = 'Sick',
-  VACATION = 'Vacation',
-  EMERGENCY = 'Emergency',
-  MAT_PAT = 'Maternity/Paternity'
 }
 
 export enum ApplicantStatus {
