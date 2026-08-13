@@ -175,6 +175,9 @@ export const EmployeeForm: React.FC<EmployeeFormProps> = ({ employee, onCancel, 
           profilePicture: profilePictureFile,
           attachments,
         });
+        window.alert(
+          `Employee login created.\nSign in with the employee's email.\nDefault password is the same email.`,
+        );
       } else {
         await updateEmployee.mutateAsync({
           employeeNumber: parsed.data.employeeNumber,
