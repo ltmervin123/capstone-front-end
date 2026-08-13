@@ -3,7 +3,7 @@ import { Plus, Search, Filter, Edit2, Trash2, Printer, X, Eye, Users, History, A
 import { type Employee, DEPARTMENTS } from '../../types/types';
 import { storageService } from '../../services/storageService';
 import { ApiRequestError } from '../../utils/apiClient';
-import { useEmployeesQuery } from '../../hooks/useEmployees';
+import { useEmployeesQuery, useDeleteEmployee } from '../../hooks/useEmployees';
 import { EmployeeForm } from './EmployeeForm';
 import { Logo } from '../../assets/common/Logo.tsx';
 import { motion, AnimatePresence } from 'motion/react';
@@ -24,6 +24,7 @@ export const EmployeeManager: React.FC = () => {
   
   // Directory state (API-backed via TanStack Query)
   const employeesQuery = useEmployeesQuery();
+  const deleteEmployee = useDeleteEmployee();
   const employees = employeesQuery.data ?? [];
   const listLoading = employeesQuery.isPending;
   const listError =
@@ -229,8 +230,23 @@ export const EmployeeManager: React.FC = () => {
     setFormReadOnly(false);
   };
 
-  const handleDelete = () => {
-    window.alert('Delete employee API is not wired yet.');
+  const handleDelete = async (emp: Employee) => {
+    const confirmed = window.confirm(
+      `Delete ${emp.surname}, ${emp.firstName} (${emp.id}) and all records for this employee? This cannot be undone.`,
+    );
+    if (!confirmed) return;
+
+    try {
+      await deleteEmployee.mutateAsync(emp.id);
+    } catch (error) {
+      const message =
+        error instanceof ApiRequestError
+          ? error.message
+          : error instanceof Error
+            ? error.message
+            : 'Failed to delete employee.';
+      window.alert(message);
+    }
   };
 
   return (
@@ -421,10 +437,15 @@ export const EmployeeManager: React.FC = () => {
                                   <Edit2 size={16} />
                                 </button>
                                 <button 
-                                  onClick={handleDelete}
-                                  className="p-2.5 text-red-600 bg-white border border-gray-100 rounded-xl shadow-sm hover:bg-red-50 transition-colors cursor-pointer" title="Delete Record"
+                                  onClick={() => void handleDelete(emp)}
+                                  disabled={deleteEmployee.isPending}
+                                  className="p-2.5 text-red-600 bg-white border border-gray-100 rounded-xl shadow-sm hover:bg-red-50 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed" title="Delete Record"
                                 >
-                                  <Trash2 size={16} />
+                                  {deleteEmployee.isPending && deleteEmployee.variables === emp.id ? (
+                                    <Loader2 size={16} className="animate-spin" />
+                                  ) : (
+                                    <Trash2 size={16} />
+                                  )}
                                 </button>
                                 <button className="p-2.5 text-gray-600 bg-white border border-gray-100 rounded-xl shadow-sm hover:bg-gray-50 transition-colors cursor-pointer" title="Print File">
                                   <Printer size={16} />

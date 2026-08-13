@@ -136,4 +136,15 @@ export const employeeService = {
 
     return response.data.employee;
   },
+
+  async deleteEmployee(employeeNumber: string): Promise<{ employeeNumber: string }> {
+    const response = await apiRequest<ApiSuccessResponse<{ employeeNumber: string }>>(
+      `/employees/${encodeURIComponent(employeeNumber)}`,
+      {
+        method: 'DELETE',
+      },
+    );
+
+    return response.data;
+  },
 };
