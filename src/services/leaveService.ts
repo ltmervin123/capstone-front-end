@@ -56,4 +56,15 @@ export const leaveService = {
 
     return response.data.record;
   },
+
+  async approveLeave(id: string): Promise<LeaveRecord> {
+    const response = await apiRequest<ApiSuccessResponse<LeavePayload>>(
+      `/leaves/${encodeURIComponent(id)}/approve`,
+      {
+        method: 'PATCH',
+      },
+    );
+
+    return response.data.record;
+  },
 };

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { CalendarDays, Check, X, Clock, Plus, FileText, Trash2, AlertCircle, Loader2 } from 'lucide-react';
 import { useCurrentUser } from '../../hooks/useAuth';
-import { useCreateLeave, useDeleteLeave, useLeavesQuery, useRejectLeave } from '../../hooks/useLeaves';
+import { useApproveLeave, useCreateLeave, useDeleteLeave, useLeavesQuery, useRejectLeave } from '../../hooks/useLeaves';
 import { useEmployeesQuery } from '../../hooks/useEmployees';
 import { createLeaveFormSchema } from '../../schemas/leave.schema';
 import { ApiRequestError } from '../../utils/apiClient';
@@ -48,6 +48,7 @@ export const LeaveRecords: React.FC = () => {
   const createLeave = useCreateLeave();
   const deleteLeave = useDeleteLeave();
   const rejectLeave = useRejectLeave();
+  const approveLeave = useApproveLeave();
 
   const leaveList = leavesQuery.data ?? [];
   const employees = employeesQuery.data ?? [];
@@ -195,6 +196,27 @@ export const LeaveRecords: React.FC = () => {
           : error instanceof Error
             ? error.message
             : 'Failed to reject leave request.';
+      window.alert(message);
+    }
+  };
+
+  const handleApprove = async (leave: LeaveRecord) => {
+    if (!isHrUser) return;
+
+    const confirmed = window.confirm(
+      `Approve the ${leave.type} request for ${leave.employeeName} (${leave.startDate} to ${leave.endDate})?`,
+    );
+    if (!confirmed) return;
+
+    try {
+      await approveLeave.mutateAsync(leave.id);
+    } catch (error) {
+      const message =
+        error instanceof ApiRequestError
+          ? error.message
+          : error instanceof Error
+            ? error.message
+            : 'Failed to approve leave request.';
       window.alert(message);
     }
   };
@@ -410,15 +432,21 @@ export const LeaveRecords: React.FC = () => {
                               <>
                                 <button
                                   type="button"
-                                  className="p-1.5 bg-green-50 text-green-800 rounded-lg opacity-60 cursor-not-allowed"
-                                  title="Approve will be available in a later update"
+                                  onClick={() => void handleApprove(l)}
+                                  disabled={approveLeave.isPending || rejectLeave.isPending || deleteLeave.isPending}
+                                  className="p-1.5 bg-green-50 text-green-800 hover:bg-green-600 hover:text-white rounded-lg transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                  title="Approve request"
                                 >
-                                  <Check size={14} className="stroke-[3]" />
+                                  {approveLeave.isPending && approveLeave.variables === l.id ? (
+                                    <Loader2 size={14} className="animate-spin" />
+                                  ) : (
+                                    <Check size={14} className="stroke-[3]" />
+                                  )}
                                 </button>
                                 <button
                                   type="button"
                                   onClick={() => void handleReject(l)}
-                                  disabled={rejectLeave.isPending || deleteLeave.isPending}
+                                  disabled={approveLeave.isPending || rejectLeave.isPending || deleteLeave.isPending}
                                   className="p-1.5 bg-rose-50 text-red-700 hover:bg-red-600 hover:text-white rounded-lg transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                                   title="Reject request"
                                 >

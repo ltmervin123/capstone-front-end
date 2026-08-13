@@ -42,3 +42,14 @@ export function useRejectLeave() {
     },
   });
 }
+
+export function useApproveLeave() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: string) => leaveService.approveLeave(id),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: LEAVES_QUERY_KEY });
+    },
+  });
+}
