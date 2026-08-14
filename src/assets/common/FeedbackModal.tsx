@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { MessageSquare, Send, X, AlertCircle, CheckCircle2, ShieldAlert, User, Mail, MessageCircle, Clock } from 'lucide-react';
-import { storageService } from '../../services/storageService';
-import { useCurrentUser } from '../../hooks/useAuth';
-import { type FeedbackItem } from '../../types/types';
+import { MessageSquare, Send, X, AlertCircle, CheckCircle2, ShieldAlert, MessageCircle, Clock } from 'lucide-react';
+import { useCreateFeedback, useFeedbackQuery } from '../../hooks/useFeedback';
+import { createFeedbackFormSchema, FEEDBACK_CATEGORIES } from '../../schemas/feedback.schema';
+import { ApiRequestError } from '../../utils/apiClient';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface FeedbackModalProps {
@@ -11,78 +11,59 @@ interface FeedbackModalProps {
 }
 
 export const FeedbackModal: React.FC<FeedbackModalProps> = ({ isOpen, onClose }) => {
-  const currentUser = useCurrentUser();
   const [activeTab, setActiveTab] = useState<'submit' | 'history'>('submit');
-  
-  // Form fields
-  const [category, setCategory] = useState('General Feedback / Suggestion');
+  const [category, setCategory] = useState<(typeof FEEDBACK_CATEGORIES)[number]>('General Feedback / Suggestion');
   const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');
   const [isAnonymous, setIsAnonymous] = useState(false);
-  
-  // State
-  const [submitting, setSubmitting] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  if (!isOpen) return null;
+  const feedbackQuery = useFeedbackQuery({ enabled: isOpen });
+  const createFeedback = useCreateFeedback();
+  const myFeedbacks = feedbackQuery.data ?? [];
+  const submitting = createFeedback.isPending;
 
-  // Retrieve user history
-  const allFeedbacks = storageService.getFeedback();
-  const myFeedbacks = allFeedbacks.filter(f => 
-    (f.senderUserId && f.senderUserId === currentUser?.id) ||
-    (f.senderEmail && f.senderEmail === currentUser?.email)
-  );
+  if (!isOpen) return null;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
     setSuccessMessage(null);
 
-    if (!subject.trim()) {
-      setErrorMessage('Please enter a subject for your feedback.');
+    const parsed = createFeedbackFormSchema.safeParse({
+      category,
+      subject,
+      message,
+      isAnonymous,
+    });
+
+    if (!parsed.success) {
+      setErrorMessage(parsed.error.issues[0]?.message ?? 'Please complete the feedback form.');
       return;
     }
 
-    if (!message.trim()) {
-      setErrorMessage('Please enter your feedback message.');
-      return;
-    }
-
-    setSubmitting(true);
-
-    try {
-      const newFeedback: FeedbackItem = {
-        id: 'FB-' + Math.random().toString(36).substr(2, 7).toUpperCase(),
-        senderUserId: currentUser?.id,
-        senderName: isAnonymous ? 'Anonymous Employee' : (currentUser?.username || 'Employee User'),
-        senderEmail: isAnonymous ? 'anonymous@normi.edu.ph' : (currentUser?.email || ''),
-        senderEmployeeId: isAnonymous ? undefined : currentUser?.employeeId,
-        category,
-        subject: subject.trim(),
-        message: message.trim(),
-        isAnonymous,
-        status: 'New',
-        createdAt: Date.now()
-      };
-
-      storageService.saveFeedback(newFeedback);
-      
-      setSuccessMessage('Thank you! Your feedback has been sent directly to HR and Admin.');
-      setSubject('');
-      setMessage('');
-      setIsAnonymous(false);
-      
-      setTimeout(() => {
-        setSuccessMessage(null);
-        setActiveTab('history');
-      }, 1500);
-
-    } catch (err: any) {
-      setErrorMessage(err.message || 'Failed to submit feedback. Please try again.');
-    } finally {
-      setSubmitting(false);
-    }
+    createFeedback.mutate(parsed.data, {
+      onSuccess: () => {
+        setSuccessMessage('Thank you! Your feedback has been sent directly to HR and Admin.');
+        setSubject('');
+        setMessage('');
+        setIsAnonymous(false);
+        setTimeout(() => {
+          setSuccessMessage(null);
+          setActiveTab('history');
+        }, 1500);
+      },
+      onError: (err) => {
+        const messageText =
+          err instanceof ApiRequestError
+            ? err.message
+            : err instanceof Error
+              ? err.message
+              : 'Failed to submit feedback. Please try again.';
+        setErrorMessage(messageText);
+      },
+    });
   };
 
   return (
@@ -175,7 +156,7 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({ isOpen, onClose })
                   </label>
                   <select
                     value={category}
-                    onChange={(e) => setCategory(e.target.value)}
+                    onChange={(e) => setCategory(e.target.value as (typeof FEEDBACK_CATEGORIES)[number])}
                     className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl font-medium text-xs text-green-950 focus:ring-2 focus:ring-yellow-400 focus:outline-none"
                   >
                     <option value="General Feedback / Suggestion">💬 General Feedback / Suggestion</option>
@@ -252,7 +233,17 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({ isOpen, onClose })
               </form>
             ) : (
               <div className="space-y-3">
-                {myFeedbacks.length === 0 ? (
+                {feedbackQuery.isPending ? (
+                  <p className="py-12 text-center text-xs font-bold uppercase tracking-wider text-gray-400">
+                    Loading your messages...
+                  </p>
+                ) : feedbackQuery.error ? (
+                  <p className="py-12 text-center text-xs font-bold text-red-700">
+                    {feedbackQuery.error instanceof ApiRequestError
+                      ? feedbackQuery.error.message
+                      : 'Failed to load your sent messages.'}
+                  </p>
+                ) : myFeedbacks.length === 0 ? (
                   <div className="py-12 text-center text-gray-400 space-y-2">
                     <MessageCircle size={36} className="mx-auto opacity-30 text-green-900" />
                     <p className="text-xs font-bold uppercase tracking-wider">No feedback sent yet</p>
