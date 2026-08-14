@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
-import { MessageSquare, Send, X, AlertCircle, CheckCircle2, ShieldAlert, MessageCircle, Clock } from 'lucide-react';
-import { useCreateFeedback, useFeedbackQuery } from '../../hooks/useFeedback';
+import React, { useEffect, useRef, useState } from 'react';
+import { MessageSquare, Send, X, AlertCircle, CheckCircle2, ShieldAlert, MessageCircle, Clock, Bell } from 'lucide-react';
+import { useCreateFeedback, useFeedbackQuery, useMarkFeedbackNotificationsRead } from '../../hooks/useFeedback';
 import { createFeedbackFormSchema, FEEDBACK_CATEGORIES } from '../../schemas/feedback.schema';
 import { ApiRequestError } from '../../utils/apiClient';
 import { motion, AnimatePresence } from 'motion/react';
@@ -19,10 +19,26 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({ isOpen, onClose })
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const feedbackQuery = useFeedbackQuery({ enabled: isOpen });
+  const feedbackQuery = useFeedbackQuery({ enabled: isOpen, refetchInterval: isOpen ? 10000 : false });
   const createFeedback = useCreateFeedback();
+  const markNotificationsRead = useMarkFeedbackNotificationsRead();
   const myFeedbacks = feedbackQuery.data ?? [];
   const submitting = createFeedback.isPending;
+  const unreadCount = myFeedbacks.filter((item) => item.hasUnreadNotification).length;
+  const viewedHistoryRef = useRef(false);
+
+  useEffect(() => {
+    if (isOpen && activeTab === 'history') {
+      viewedHistoryRef.current = true;
+    }
+  }, [isOpen, activeTab]);
+
+  useEffect(() => {
+    if (!isOpen && viewedHistoryRef.current) {
+      viewedHistoryRef.current = false;
+      markNotificationsRead.mutate();
+    }
+  }, [isOpen, markNotificationsRead]);
 
   if (!isOpen) return null;
 
@@ -83,7 +99,7 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({ isOpen, onClose })
           initial={{ opacity: 0, scale: 0.95, y: 20 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 20 }}
-          className="relative w-full max-w-xl bg-white rounded-[32px] shadow-2xl overflow-hidden border border-gray-100 flex flex-col max-h-[90vh]"
+          className="relative w-full max-w-2xl bg-white rounded-[32px] shadow-2xl overflow-hidden border border-gray-100 flex flex-col max-h-[90vh]"
         >
           {/* Header */}
           <div className="bg-green-900 px-6 py-5 text-white flex items-center justify-between">
@@ -125,6 +141,11 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({ isOpen, onClose })
               }`}
             >
               My Sent Messages ({myFeedbacks.length})
+              {unreadCount > 0 && (
+                <span className="ml-2 inline-flex items-center justify-center min-w-4 h-4 px-1 rounded-full bg-yellow-400 text-green-950 text-[9px] font-black">
+                  {unreadCount}
+                </span>
+              )}
               {activeTab === 'history' && (
                 <div className="absolute bottom-0 left-0 right-0 h-1 bg-yellow-400" />
               )}
@@ -251,12 +272,28 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({ isOpen, onClose })
                   </div>
                 ) : (
                   myFeedbacks.map((fb) => (
-                    <div key={fb.id} className="p-4 bg-gray-50 rounded-2xl border border-gray-150 space-y-2">
+                    <div
+                      key={fb.id}
+                      className={`p-4 bg-gray-50 rounded-2xl border space-y-2 ${
+                        fb.hasUnreadNotification ? 'border-yellow-400 ring-1 ring-yellow-300' : 'border-gray-150'
+                      }`}
+                    >
                       <div className="flex items-center justify-between">
                         <span className="px-2.5 py-0.5 bg-green-100 text-green-900 text-[10px] font-black uppercase rounded-full">
                           {fb.category}
                         </span>
                         <div className="flex items-center gap-2">
+                          {fb.hasUnreadNotification ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-yellow-400 text-green-950 text-[9px] font-black uppercase rounded-full">
+                              <Bell size={10} />
+                              New update
+                            </span>
+                          ) : fb.employeeNotified ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-green-800 text-yellow-400 text-[9px] font-black uppercase rounded-full">
+                              <CheckCircle2 size={10} />
+                              Notified
+                            </span>
+                          ) : null}
                           <span className={`px-2 py-0.5 text-[9px] font-black uppercase rounded-full ${
                             fb.status === 'Resolved' ? 'bg-green-800 text-yellow-400' :
                             fb.status === 'Under Review' ? 'bg-yellow-400 text-green-950' :
@@ -269,12 +306,10 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({ isOpen, onClose })
                           </span>
                         </div>
                       </div>
-
                       <h4 className="font-black text-xs text-green-950">{fb.subject}</h4>
                       <p className="text-xs text-gray-600 bg-white p-3 rounded-xl border border-gray-100 whitespace-pre-wrap leading-relaxed">
                         {fb.message}
                       </p>
-
                       {fb.adminResponse && (
                         <div className="p-3 bg-yellow-50 border border-yellow-200/60 rounded-xl space-y-1 mt-2">
                           <div className="flex items-center gap-1.5 text-xs font-black text-green-900 uppercase">

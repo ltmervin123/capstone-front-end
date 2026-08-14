@@ -16,3 +16,10 @@ export const createFeedbackFormSchema = z.object({
 });
 
 export type CreateFeedbackFormValues = z.infer<typeof createFeedbackFormSchema>;
+
+export const replyFeedbackFormSchema = z.object({
+  adminResponse: z.string().trim().min(1, 'Please enter a response for the employee.'),
+  status: z.enum(['New', 'Under Review', 'Resolved']),
+});
+
+export type ReplyFeedbackFormValues = z.infer<typeof replyFeedbackFormSchema>;

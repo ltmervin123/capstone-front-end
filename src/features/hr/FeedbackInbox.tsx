@@ -1,87 +1,254 @@
-import React, { useState } from 'react';
-import { MessageSquare, Inbox, Search, Filter, CheckCircle2, Clock, Trash2, Send, ShieldAlert, AlertCircle, RefreshCw, Eye } from 'lucide-react';
-import { storageService } from '../../services/storageService.ts';
-import { useCurrentUser } from '../../hooks/useAuth';
-import { type FeedbackItem } from '../../types/types.ts';
+import React, { memo, useCallback, useState } from 'react';
+import { MessageSquare, Inbox, Search, Filter, CheckCircle2, Clock, ShieldAlert, AlertCircle, RefreshCw, Loader2, Send, Trash2 } from 'lucide-react';
+import { useDeleteFeedback, useFeedbackQuery, useReplyToFeedback, useUpdateFeedbackStatus } from '../../hooks/useFeedback';
+import { replyFeedbackFormSchema } from '../../schemas/feedback.schema';
+import { ApiRequestError } from '../../utils/apiClient';
 import { Logo } from '../../assets/common/Logo.tsx';
+import { type FeedbackItem } from '../../types/types.ts';
 import { motion, AnimatePresence } from 'motion/react';
 
+const FeedbackInboxCard = memo(function FeedbackInboxCard({
+  item,
+  onStatusChange,
+  onReply,
+  onDelete,
+}: {
+  item: FeedbackItem;
+  onStatusChange: (item: FeedbackItem, status: FeedbackItem['status']) => void;
+  onReply: (item: FeedbackItem) => void;
+  onDelete: (item: FeedbackItem) => void;
+}) {
+  return (
+    <div
+      className={`bg-white rounded-2xl border p-6 shadow-sm transition-all hover:shadow-md ${
+        item.status === 'New' ? 'border-l-4 border-l-blue-600 border-gray-150' : 'border-gray-100'
+      }`}
+    >
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-4 border-b border-gray-100">
+        <div className="flex items-center gap-3">
+          {item.senderProfilePicture && !item.isAnonymous ? (
+            <img
+              src={item.senderProfilePicture}
+              alt={item.senderName}
+              className="w-10 h-10 rounded-xl object-cover shadow-inner"
+            />
+          ) : (
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-xs ${
+              item.isAnonymous ? 'bg-gray-100 text-gray-600' : 'bg-green-100 text-green-900'
+            }`}>
+              {item.isAnonymous ? 'AN' : item.senderName.charAt(0).toUpperCase()}
+            </div>
+          )}
+          <div>
+            <div className="flex items-center gap-2">
+              <h4 className="font-black text-sm text-green-950">{item.senderName}</h4>
+              {item.isAnonymous && (
+                <span className="px-2 py-0.5 bg-gray-100 text-gray-600 text-[9px] font-black uppercase rounded-md flex items-center gap-1">
+                  <ShieldAlert size={10} /> Anonymous
+                </span>
+              )}
+              {item.senderEmployeeId && (
+                <span className="text-[10px] font-mono text-gray-400 font-bold">({item.senderEmployeeId})</span>
+              )}
+            </div>
+            <p className="text-[11px] text-gray-400 font-medium">{item.senderEmail}</p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <span className="px-3 py-1 bg-green-50 text-green-900 text-[10px] font-black uppercase rounded-full border border-green-100">
+            {item.category}
+          </span>
+          <span className={`px-3 py-1 text-[10px] font-black uppercase rounded-full ${
+            item.status === 'Resolved' ? 'bg-green-800 text-yellow-400' :
+            item.status === 'Under Review' ? 'bg-yellow-400 text-green-950' :
+            'bg-blue-100 text-blue-900'
+          }`}>
+            {item.status}
+          </span>
+          <span className="text-[10px] text-gray-400 font-medium">
+            {new Date(item.createdAt).toLocaleDateString()}
+          </span>
+        </div>
+      </div>
+
+      <div className="py-4 space-y-2">
+        <h3 className="font-black text-sm text-green-900 uppercase tracking-tight">{item.subject}</h3>
+        <p className="text-xs text-gray-700 bg-gray-50/70 p-4 rounded-xl border border-gray-100 whitespace-pre-wrap leading-relaxed font-sans">
+          {item.message}
+        </p>
+      </div>
+
+      {item.adminResponse && (
+        <div className="p-3 bg-yellow-50/80 border border-yellow-200/60 rounded-xl space-y-1 mb-4">
+          <p className="text-[10px] font-black uppercase tracking-wider text-green-900">Recorded HR/Admin Response:</p>
+          <p className="text-xs text-green-950 font-medium leading-relaxed">{item.adminResponse}</p>
+        </div>
+      )}
+
+      <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] font-black text-gray-400 uppercase">Change Status:</span>
+          <button
+            type="button"
+            onClick={() => onStatusChange(item, 'New')}
+            className={`px-2.5 py-1 text-[10px] font-black uppercase rounded-lg border cursor-pointer ${
+              item.status === 'New' ? 'bg-blue-600 text-white border-blue-600' : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+            }`}
+          >
+            New
+          </button>
+          <button
+            type="button"
+            onClick={() => onStatusChange(item, 'Under Review')}
+            className={`px-2.5 py-1 text-[10px] font-black uppercase rounded-lg border cursor-pointer ${
+              item.status === 'Under Review' ? 'bg-yellow-400 text-green-950 border-yellow-400' : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+            }`}
+          >
+            Review
+          </button>
+          <button
+            type="button"
+            onClick={() => onStatusChange(item, 'Resolved')}
+            className={`px-2.5 py-1 text-[10px] font-black uppercase rounded-lg border cursor-pointer ${
+              item.status === 'Resolved' ? 'bg-green-900 text-yellow-400 border-green-900' : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+            }`}
+          >
+            Resolved
+          </button>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => onReply(item)}
+            className="flex items-center gap-1.5 px-4 py-2 bg-green-900 text-yellow-400 font-black text-xs uppercase rounded-xl shadow-xs hover:bg-green-800 transition-all cursor-pointer"
+          >
+            <Send size={12} />
+            {item.adminResponse ? 'Edit Response' : 'Reply / Resolve'}
+          </button>
+          <button
+            type="button"
+            onClick={() => onDelete(item)}
+            className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-xl transition-colors cursor-pointer"
+            title="Delete Message"
+          >
+            <Trash2 size={16} />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+});
+
 export const FeedbackInbox: React.FC = () => {
-  const currentUser = useCurrentUser();
-  const [feedbacks, setFeedbacks] = useState<FeedbackItem[]>(() => storageService.getFeedback());
-  
-  // Search and Filter states
+  const feedbackQuery = useFeedbackQuery();
+  const updateStatus = useUpdateFeedbackStatus();
+  const replyToFeedback = useReplyToFeedback();
+  const deleteFeedback = useDeleteFeedback();
+  const mutateStatus = updateStatus.mutate;
+  const mutateDelete = deleteFeedback.mutate;
+  const feedbacks = feedbackQuery.data ?? [];
+  const listLoading = feedbackQuery.isPending;
+  const listError =
+    feedbackQuery.error instanceof ApiRequestError
+      ? feedbackQuery.error.message
+      : feedbackQuery.error instanceof Error
+        ? feedbackQuery.error.message
+        : feedbackQuery.error
+          ? 'Failed to load feedback messages.'
+          : null;
+
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('All');
   const [filterCategory, setFilterCategory] = useState<string>('All');
-
-  // Response Modal State
   const [selectedFeedback, setSelectedFeedback] = useState<FeedbackItem | null>(null);
   const [responseText, setResponseText] = useState('');
   const [responseStatus, setResponseStatus] = useState<'New' | 'Under Review' | 'Resolved'>('Resolved');
+  const [actionError, setActionError] = useState<string | null>(null);
 
-  const reloadFeedbacks = () => {
-    setFeedbacks(storageService.getFeedback());
+  const actionErrorMessage = (err: unknown) =>
+    err instanceof ApiRequestError
+      ? err.message
+      : err instanceof Error
+        ? err.message
+        : 'Request failed. Please try again.';
+
+  const closeReplyModal = () => {
+    setSelectedFeedback(null);
+    setResponseText('');
+    setActionError(null);
   };
 
-  const filtered = feedbacks.filter(f => {
-    const matchesSearch = f.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          f.message.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          f.senderName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          f.category.toLowerCase().includes(searchQuery.toLowerCase());
+  const openReplyModal = useCallback((item: FeedbackItem) => {
+    setSelectedFeedback(item);
+    setResponseText(item.adminResponse || '');
+    setResponseStatus(item.status);
+    setActionError(null);
+  }, []);
+
+  const handleStatusChange = useCallback((item: FeedbackItem, status: FeedbackItem['status']) => {
+    if (item.status === status) return;
+    setActionError(null);
+    mutateStatus(
+      { id: item.id, status },
+      { onError: (err) => setActionError(actionErrorMessage(err)) },
+    );
+  }, [mutateStatus]);
+
+  const handleDelete = useCallback((item: FeedbackItem) => {
+    if (!window.confirm('Are you sure you want to delete this feedback message?')) return;
+    setActionError(null);
+    mutateDelete(item.id, {
+      onError: (err) => setActionError(actionErrorMessage(err)),
+    });
+  }, [mutateDelete]);
+
+  const handleSaveResponse = () => {
+    if (!selectedFeedback || replyToFeedback.isPending) return;
+
+    const parsed = replyFeedbackFormSchema.safeParse({
+      adminResponse: responseText,
+      status: responseStatus,
+    });
+
+    if (!parsed.success) {
+      setActionError(parsed.error.issues[0]?.message ?? 'Please enter a response for the employee.');
+      return;
+    }
+
+    setActionError(null);
+    replyToFeedback.mutate(
+      {
+        id: selectedFeedback.id,
+        adminResponse: parsed.data.adminResponse,
+        status: parsed.data.status,
+      },
+      {
+        onSuccess: () => closeReplyModal(),
+        onError: (err) => setActionError(actionErrorMessage(err)),
+      },
+    );
+  };
+
+  const filtered = feedbacks.filter((f) => {
+    const matchesSearch =
+      f.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      f.message.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      f.senderName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      f.category.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = filterStatus === 'All' || f.status === filterStatus;
     const matchesCategory = filterCategory === 'All' || f.category === filterCategory;
     return matchesSearch && matchesStatus && matchesCategory;
   });
 
   const totalCount = feedbacks.length;
-  const newCount = feedbacks.filter(f => f.status === 'New').length;
-  const reviewCount = feedbacks.filter(f => f.status === 'Under Review').length;
-  const resolvedCount = feedbacks.filter(f => f.status === 'Resolved').length;
-
-  const handleOpenReplyModal = (f: FeedbackItem) => {
-    setSelectedFeedback(f);
-    setResponseText(f.adminResponse || '');
-    setResponseStatus(f.status);
-  };
-
-  const handleSaveResponse = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedFeedback) return;
-
-    const updated: FeedbackItem = {
-      ...selectedFeedback,
-      adminResponse: responseText.trim(),
-      status: responseStatus,
-      updatedAt: Date.now()
-    };
-
-    storageService.saveFeedback(updated);
-    reloadFeedbacks();
-    setSelectedFeedback(null);
-    setResponseText('');
-  };
-
-  const handleDelete = (id: string) => {
-    if (window.confirm('Are you sure you want to delete this feedback message?')) {
-      storageService.deleteFeedback(id);
-      reloadFeedbacks();
-    }
-  };
-
-  const handleQuickStatusChange = (f: FeedbackItem, newStatus: 'New' | 'Under Review' | 'Resolved') => {
-    const updated: FeedbackItem = {
-      ...f,
-      status: newStatus,
-      updatedAt: Date.now()
-    };
-    storageService.saveFeedback(updated);
-    reloadFeedbacks();
-  };
+  const newCount = feedbacks.filter((f) => f.status === 'New').length;
+  const reviewCount = feedbacks.filter((f) => f.status === 'Under Review').length;
+  const resolvedCount = feedbacks.filter((f) => f.status === 'Resolved').length;
 
   return (
     <div className="space-y-6">
-      {/* Page Header */}
       <header className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div className="flex items-center gap-4">
           <Logo className="w-12 h-12" />
@@ -99,15 +266,29 @@ export const FeedbackInbox: React.FC = () => {
         </div>
 
         <button
-          onClick={reloadFeedbacks}
-          className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 hover:bg-gray-50 text-green-900 font-bold text-xs rounded-xl shadow-xs transition-all self-start md:self-auto cursor-pointer"
+          onClick={() => void feedbackQuery.refetch()}
+          disabled={feedbackQuery.isFetching}
+          className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 hover:bg-gray-50 text-green-900 font-bold text-xs rounded-xl shadow-xs transition-all self-start md:self-auto cursor-pointer disabled:opacity-50"
         >
-          <RefreshCw size={14} />
+          <RefreshCw size={14} className={feedbackQuery.isFetching ? 'animate-spin' : ''} />
           Refresh Messages
         </button>
       </header>
 
-      {/* Metrics Row */}
+      {listError && (
+        <div className="p-3 bg-red-50 border border-red-100 rounded-xl flex items-center gap-2 text-xs text-red-800 font-medium">
+          <AlertCircle size={16} className="shrink-0 text-red-600" />
+          <span>{listError}</span>
+        </div>
+      )}
+
+      {actionError && !selectedFeedback && (
+        <div className="p-3 bg-red-50 border border-red-100 rounded-xl flex items-center gap-2 text-xs text-red-800 font-medium">
+          <AlertCircle size={16} className="shrink-0 text-red-600" />
+          <span>{actionError}</span>
+        </div>
+      )}
+
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex items-center justify-between">
           <div>
@@ -150,7 +331,6 @@ export const FeedbackInbox: React.FC = () => {
         </div>
       </div>
 
-      {/* Search and Filters */}
       <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
         <div className="relative w-full md:w-96">
           <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -193,9 +373,13 @@ export const FeedbackInbox: React.FC = () => {
         </div>
       </div>
 
-      {/* Feedback Messages List */}
       <div className="space-y-4">
-        {filtered.length === 0 ? (
+        {listLoading ? (
+          <div className="bg-white p-12 rounded-3xl border border-gray-100 text-center space-y-3">
+            <Loader2 size={32} className="mx-auto text-green-800 animate-spin" />
+            <p className="text-xs font-bold uppercase tracking-wider text-gray-400">Loading feedback messages...</p>
+          </div>
+        ) : filtered.length === 0 ? (
           <div className="bg-white p-12 rounded-3xl border border-gray-100 text-center space-y-3">
             <Inbox size={48} className="mx-auto text-gray-300" />
             <h3 className="text-sm font-black uppercase tracking-wider text-green-950">No Messages Found</h3>
@@ -203,121 +387,17 @@ export const FeedbackInbox: React.FC = () => {
           </div>
         ) : (
           filtered.map((item) => (
-            <div 
+            <FeedbackInboxCard
               key={item.id}
-              className={`bg-white rounded-2xl border p-6 shadow-sm transition-all hover:shadow-md ${
-                item.status === 'New' ? 'border-l-4 border-l-blue-600 border-gray-150' : 'border-gray-100'
-              }`}
-            >
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-4 border-b border-gray-100">
-                <div className="flex items-center gap-3">
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-xs ${
-                    item.isAnonymous ? 'bg-gray-100 text-gray-600' : 'bg-green-100 text-green-900'
-                  }`}>
-                    {item.isAnonymous ? 'AN' : item.senderName.charAt(0).toUpperCase()}
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h4 className="font-black text-sm text-green-950">{item.senderName}</h4>
-                      {item.isAnonymous && (
-                        <span className="px-2 py-0.5 bg-gray-100 text-gray-600 text-[9px] font-black uppercase rounded-md flex items-center gap-1">
-                          <ShieldAlert size={10} /> Anonymous
-                        </span>
-                      )}
-                      {item.senderEmployeeId && (
-                        <span className="text-[10px] font-mono text-gray-400 font-bold">({item.senderEmployeeId})</span>
-                      )}
-                    </div>
-                    <p className="text-[11px] text-gray-400 font-medium">{item.senderEmail}</p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <span className="px-3 py-1 bg-green-50 text-green-900 text-[10px] font-black uppercase rounded-full border border-green-100">
-                    {item.category}
-                  </span>
-                  <span className={`px-3 py-1 text-[10px] font-black uppercase rounded-full ${
-                    item.status === 'Resolved' ? 'bg-green-800 text-yellow-400' :
-                    item.status === 'Under Review' ? 'bg-yellow-400 text-green-950' :
-                    'bg-blue-100 text-blue-900'
-                  }`}>
-                    {item.status}
-                  </span>
-                  <span className="text-[10px] text-gray-400 font-medium">
-                    {new Date(item.createdAt).toLocaleDateString()}
-                  </span>
-                </div>
-              </div>
-
-              {/* Message Body */}
-              <div className="py-4 space-y-2">
-                <h3 className="font-black text-sm text-green-900 uppercase tracking-tight">{item.subject}</h3>
-                <p className="text-xs text-gray-700 bg-gray-50/70 p-4 rounded-xl border border-gray-100 whitespace-pre-wrap leading-relaxed font-sans">
-                  {item.message}
-                </p>
-              </div>
-
-              {/* Existing Response preview if any */}
-              {item.adminResponse && (
-                <div className="p-3 bg-yellow-50/80 border border-yellow-200/60 rounded-xl space-y-1 mb-4">
-                  <p className="text-[10px] font-black uppercase tracking-wider text-green-900">Recorded HR/Admin Response:</p>
-                  <p className="text-xs text-green-950 font-medium leading-relaxed">{item.adminResponse}</p>
-                </div>
-              )}
-
-              {/* Card Actions */}
-              <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-bold text-gray-400 uppercase">Change Status:</span>
-                  <button
-                    onClick={() => handleQuickStatusChange(item, 'New')}
-                    className={`px-2.5 py-1 text-[10px] font-black uppercase rounded-lg border cursor-pointer ${
-                      item.status === 'New' ? 'bg-blue-600 text-white border-blue-600' : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
-                    }`}
-                  >
-                    New
-                  </button>
-                  <button
-                    onClick={() => handleQuickStatusChange(item, 'Under Review')}
-                    className={`px-2.5 py-1 text-[10px] font-black uppercase rounded-lg border cursor-pointer ${
-                      item.status === 'Under Review' ? 'bg-yellow-400 text-green-950 border-yellow-400' : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
-                    }`}
-                  >
-                    Review
-                  </button>
-                  <button
-                    onClick={() => handleQuickStatusChange(item, 'Resolved')}
-                    className={`px-2.5 py-1 text-[10px] font-black uppercase rounded-lg border cursor-pointer ${
-                      item.status === 'Resolved' ? 'bg-green-900 text-yellow-400 border-green-900' : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
-                    }`}
-                  >
-                    Resolved
-                  </button>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => handleOpenReplyModal(item)}
-                    className="flex items-center gap-1.5 px-4 py-2 bg-green-900 text-yellow-400 font-black text-xs uppercase rounded-xl shadow-xs hover:bg-green-800 transition-all cursor-pointer"
-                  >
-                    <Send size={12} />
-                    {item.adminResponse ? 'Edit Response' : 'Reply / Resolve'}
-                  </button>
-                  <button
-                    onClick={() => handleDelete(item.id)}
-                    className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-xl transition-colors cursor-pointer"
-                    title="Delete Message"
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                </div>
-              </div>
-            </div>
+              item={item}
+              onStatusChange={handleStatusChange}
+              onReply={openReplyModal}
+              onDelete={handleDelete}
+            />
           ))
         )}
       </div>
 
-      {/* Reply Modal */}
       <AnimatePresence>
         {selectedFeedback && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -325,7 +405,7 @@ export const FeedbackInbox: React.FC = () => {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              onClick={() => setSelectedFeedback(null)}
+              onClick={closeReplyModal}
               className="absolute inset-0 bg-green-950/80 backdrop-blur-sm"
             />
 
@@ -338,14 +418,22 @@ export const FeedbackInbox: React.FC = () => {
               <div className="flex items-center justify-between pb-3 border-b border-gray-100">
                 <h3 className="text-base font-black text-green-950 uppercase tracking-tight">Reply to Feedback</h3>
                 <button
-                  onClick={() => setSelectedFeedback(null)}
-                  className="p-1 text-gray-400 hover:text-gray-600 rounded-lg"
+                  type="button"
+                  onClick={closeReplyModal}
+                  className="p-1 text-gray-400 hover:text-gray-600 rounded-lg cursor-pointer"
                 >
                   ✕
                 </button>
               </div>
 
               <div className="space-y-3">
+                {actionError && (
+                  <div className="p-3 bg-red-50 border border-red-100 rounded-xl flex items-center gap-2 text-xs text-red-800 font-medium">
+                    <AlertCircle size={16} className="shrink-0 text-red-600" />
+                    <span>{actionError}</span>
+                  </div>
+                )}
+
                 <div className="p-3 bg-gray-50 rounded-xl border border-gray-100 text-xs">
                   <p className="font-bold text-green-900">{selectedFeedback.subject}</p>
                   <p className="text-gray-500 text-[11px] mt-1">{selectedFeedback.message}</p>
@@ -370,7 +458,7 @@ export const FeedbackInbox: React.FC = () => {
                   </label>
                   <select
                     value={responseStatus}
-                    onChange={(e) => setResponseStatus(e.target.value as any)}
+                    onChange={(e) => setResponseStatus(e.target.value as 'New' | 'Under Review' | 'Resolved')}
                     className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-green-950 focus:outline-none"
                   >
                     <option value="New">New</option>
@@ -383,17 +471,18 @@ export const FeedbackInbox: React.FC = () => {
               <div className="flex items-center justify-end gap-3 pt-3 border-t border-gray-100">
                 <button
                   type="button"
-                  onClick={() => setSelectedFeedback(null)}
+                  onClick={closeReplyModal}
                   className="px-4 py-2 text-xs font-bold text-gray-500 hover:text-gray-700 cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="button"
+                  disabled={replyToFeedback.isPending}
                   onClick={handleSaveResponse}
-                  className="px-5 py-2 bg-green-900 text-yellow-400 font-black text-xs uppercase tracking-wider rounded-xl hover:bg-green-800 transition-all cursor-pointer"
+                  className="px-5 py-2 bg-green-900 text-yellow-400 font-black text-xs uppercase tracking-wider rounded-xl hover:bg-green-800 transition-all cursor-pointer disabled:opacity-50"
                 >
-                  Save & Notify Employee
+                  {replyToFeedback.isPending ? 'Saving...' : 'Save & Notify Employee'}
                 </button>
               </div>
             </motion.div>

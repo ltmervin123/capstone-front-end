@@ -16,6 +16,15 @@ export interface CreateFeedbackPayload {
   isAnonymous: boolean;
 }
 
+export interface UpdateFeedbackStatusPayload {
+  status: FeedbackItem['status'];
+}
+
+export interface ReplyFeedbackPayload {
+  adminResponse: string;
+  status: FeedbackItem['status'];
+}
+
 export const feedbackService = {
   async listFeedback(): Promise<FeedbackItem[]> {
     const response = await apiRequest<ApiSuccessResponse<FeedbackListPayload>>('/feedback');
@@ -29,5 +38,51 @@ export const feedbackService = {
     });
 
     return response.data.record;
+  },
+
+  async updateFeedbackStatus(id: string, payload: UpdateFeedbackStatusPayload): Promise<FeedbackItem> {
+    const response = await apiRequest<ApiSuccessResponse<FeedbackPayload>>(
+      `/feedback/${encodeURIComponent(id)}/status`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify(payload),
+      },
+    );
+
+    return response.data.record;
+  },
+
+  async replyToFeedback(id: string, payload: ReplyFeedbackPayload): Promise<FeedbackItem> {
+    const response = await apiRequest<ApiSuccessResponse<FeedbackPayload>>(
+      `/feedback/${encodeURIComponent(id)}/reply`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify(payload),
+      },
+    );
+
+    return response.data.record;
+  },
+
+  async deleteFeedback(id: string): Promise<{ id: string }> {
+    const response = await apiRequest<ApiSuccessResponse<{ id: string }>>(
+      `/feedback/${encodeURIComponent(id)}`,
+      {
+        method: 'DELETE',
+      },
+    );
+
+    return response.data;
+  },
+
+  async markNotificationsRead(): Promise<{ count: number }> {
+    const response = await apiRequest<ApiSuccessResponse<{ count: number }>>(
+      '/feedback/notifications/read',
+      {
+        method: 'PATCH',
+      },
+    );
+
+    return response.data;
   },
 };

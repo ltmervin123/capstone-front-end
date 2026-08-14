@@ -179,12 +179,15 @@ export interface FeedbackItem {
   senderName: string;
   senderEmail: string;
   senderEmployeeId?: string;
+  senderProfilePicture?: string;
   category: string;
   subject: string;
   message: string;
   isAnonymous: boolean;
   status: 'New' | 'Under Review' | 'Resolved';
   adminResponse?: string;
+  employeeNotified?: boolean;
+  hasUnreadNotification?: boolean;
   createdAt: number;
   updatedAt?: number;
 }

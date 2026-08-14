@@ -22,6 +22,7 @@ import { type Employee, Role } from './types/types.ts';
 import { motion, AnimatePresence } from 'motion/react';
 import { MessageSquare } from 'lucide-react';
 import { useInitializeAuth, useLogout } from './hooks/useAuth';
+import { useFeedbackQuery } from './hooks/useFeedback';
 import { useAuthStore } from './stores/authStore';
 import { clearLegacyMockDataOnce } from './services/storageService.ts';
 
@@ -31,6 +32,12 @@ export default function App() {
   const currentUser = useAuthStore((state) => state.user);
   const isInitialized = useAuthStore((state) => state.isInitialized);
   const logoutMutation = useLogout();
+  const isEmployeeAccount = !!currentUser?.employeeId || currentUser?.role === Role.EMPLOYEE;
+  const feedbackQuery = useFeedbackQuery({
+    enabled: isInitialized && currentUser?.role === Role.EMPLOYEE,
+    refetchInterval: currentUser?.role === Role.EMPLOYEE ? 15000 : false,
+  });
+  const unreadFeedbackCount = (feedbackQuery.data ?? []).filter((item) => item.hasUnreadNotification).length;
   const [activeView, setActiveView] = useState<string>('dashboard');
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false);
@@ -119,8 +126,6 @@ export default function App() {
     }
   };
 
-  const isEmployeeAccount = !!currentUser?.employeeId || currentUser?.role === Role.EMPLOYEE;
-
   return (
     <div className="flex min-h-screen bg-[#fdfcf0] text-green-950 font-sans selection:bg-yellow-200 selection:text-green-900">
       <Sidebar 
@@ -151,10 +156,22 @@ export default function App() {
         <button
           onClick={() => setIsFeedbackModalOpen(true)}
           className="fixed bottom-6 right-6 z-40 flex items-center gap-2.5 px-4 py-3 bg-yellow-400 hover:bg-yellow-300 text-green-950 font-black text-xs uppercase tracking-wider rounded-2xl shadow-xl hover:shadow-2xl hover:scale-105 active:scale-95 transition-all border-2 border-green-900 cursor-pointer"
-          title="Send feedback or inquiries to HR"
+          title={unreadFeedbackCount > 0 ? 'You have a new HR / Admin update' : 'Send feedback or inquiries to HR'}
         >
-          <MessageSquare size={16} className="text-green-900" />
+          <span className="relative">
+            <MessageSquare size={16} className="text-green-900" />
+            {unreadFeedbackCount > 0 && (
+              <span className="absolute -top-2 -right-2 min-w-4 h-4 px-1 rounded-full bg-red-600 text-white text-[9px] font-black leading-4 text-center">
+                {unreadFeedbackCount}
+              </span>
+            )}
+          </span>
           <span className="hidden sm:inline">Send Feedback</span>
+          {unreadFeedbackCount > 0 && (
+            <span className="hidden sm:inline-flex items-center px-2 py-0.5 rounded-full bg-green-900 text-yellow-400 text-[9px] font-black uppercase tracking-wider">
+              New update
+            </span>
+          )}
         </button>
       )}
 

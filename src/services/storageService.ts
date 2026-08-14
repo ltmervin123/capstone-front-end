@@ -3,7 +3,6 @@ import type {
   AuditLog,
   PayrollRecord,
   LeaveRecord,
-  FeedbackItem,
   AttendanceRecord,
   Applicant,
 } from "../types/types";
@@ -177,30 +176,5 @@ export const storageService = {
       attendance.push(record);
     }
     localStorage.setItem(STORAGE_KEYS.ATTENDANCE, JSON.stringify(attendance));
-  },
-
-  // Feedback Inbox
-  getFeedback: (): FeedbackItem[] => {
-    const data = localStorage.getItem(STORAGE_KEYS.FEEDBACK);
-    if (!data) return [];
-    return JSON.parse(data);
-  },
-
-  saveFeedback: (item: FeedbackItem) => {
-    const feedbackList = storageService.getFeedback();
-    const index = feedbackList.findIndex(f => f.id === item.id);
-    if (index >= 0) {
-      feedbackList[index] = { ...item, updatedAt: Date.now() };
-    } else {
-      feedbackList.unshift({ ...item, updatedAt: Date.now() });
-    }
-    localStorage.setItem(STORAGE_KEYS.FEEDBACK, JSON.stringify(feedbackList));
-    storageService.addLog(item.senderName || 'System', `Submitted feedback`, `Subject: ${item.subject}`);
-  },
-
-  deleteFeedback: (id: string) => {
-    const feedbackList = storageService.getFeedback().filter(f => f.id !== id);
-    localStorage.setItem(STORAGE_KEYS.FEEDBACK, JSON.stringify(feedbackList));
-    storageService.addLog('System', `Deleted feedback item`, `ID: ${id}`);
   },
 };
