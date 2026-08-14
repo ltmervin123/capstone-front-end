@@ -18,13 +18,33 @@ import { FeedbackInbox } from './features/hr/FeedbackInbox.tsx';
 import { FeedbackModal } from './assets/common/FeedbackModal.tsx';
 import { AdminDashboard } from './features/admin/AdminDashboard';
 import { Logo } from './assets/common/Logo';
-import { type Employee, Role } from './types/types.ts';
+import { type User, Role } from './types/types.ts';
 import { motion, AnimatePresence } from 'motion/react';
 import { MessageSquare } from 'lucide-react';
 import { useInitializeAuth, useLogout } from './hooks/useAuth';
 import { useFeedbackQuery } from './hooks/useFeedback';
 import { useAuthStore } from './stores/authStore';
 import { clearLegacyMockDataOnce } from './services/storageService.ts';
+
+function getDefaultView(user: User): string {
+  if (user.role === Role.EMPLOYEE) {
+    const permissions = user.permissions;
+    if (!permissions || permissions.attendance !== false) return 'attendance';
+    if (permissions.leaves !== false) return 'leaves';
+    if (permissions.payroll !== false) return 'payroll';
+    return 'attendance';
+  }
+
+  if (user.role !== Role.ADMIN && user.permissions?.dashboard === false) {
+    const permissions = user.permissions;
+    if (permissions.employees !== false) return 'employees';
+    if (permissions.attendance !== false) return 'attendance';
+    if (permissions.leaves !== false) return 'leaves';
+    return 'employees';
+  }
+
+  return 'dashboard';
+}
 
 export default function App() {
   useInitializeAuth();
@@ -39,12 +59,18 @@ export default function App() {
   });
   const unreadFeedbackCount = (feedbackQuery.data ?? []).filter((item) => item.hasUnreadNotification).length;
   const [activeView, setActiveView] = useState<string>('dashboard');
-  const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false);
 
   useEffect(() => {
     clearLegacyMockDataOnce();
   }, []);
+
+  useEffect(() => {
+    if (!currentUser) return;
+    if (currentUser.role === Role.EMPLOYEE && activeView === 'dashboard') {
+      setActiveView(getDefaultView(currentUser));
+    }
+  }, [currentUser, activeView]);
 
   const handleLogout = () => {
     logoutMutation.mutate();
@@ -52,7 +78,8 @@ export default function App() {
   };
 
   const handleLoginSuccess = () => {
-    setActiveView('dashboard');
+    const user = useAuthStore.getState().user;
+    setActiveView(user ? getDefaultView(user) : 'dashboard');
   };
 
   if (!isInitialized) return null;
@@ -75,10 +102,15 @@ export default function App() {
   );
 
   const renderContent = () => {
+    if (currentUser.role === Role.EMPLOYEE && activeView === 'dashboard') {
+      return <Unauthorized />;
+    }
+
     // Check permissions
     if (currentUser.role !== Role.ADMIN) {
       const p = currentUser.permissions;
       if (p) {
+        if (activeView === 'dashboard' && p.dashboard === false) return <Unauthorized />;
         if (activeView === 'employees' && p.employees === false) return <Unauthorized />;
         if (activeView === 'ai-search' && p.aiSearch === false) return <Unauthorized />;
         if ((activeView === 'reports' || activeView === 'employment-report' || activeView === 'promotion-report') && p.reports === false) return <Unauthorized />;
@@ -93,7 +125,7 @@ export default function App() {
     switch (activeView) {
       // HR Views
       case 'dashboard':
-        return <Dashboard user={currentUser} setActiveView={setActiveView} setSelectedEmployee={setSelectedEmployee} />;
+        return <Dashboard setActiveView={setActiveView} />;
       case 'employees':
         return <EmployeeManager />;
       case 'add-employee':
@@ -122,7 +154,7 @@ export default function App() {
         return <AdminDashboard />;
       
       default:
-        return <Dashboard user={currentUser} setActiveView={setActiveView} setSelectedEmployee={setSelectedEmployee} />;
+        return <Dashboard setActiveView={setActiveView} />;
     }
   };
 

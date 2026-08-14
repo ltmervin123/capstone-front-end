@@ -84,6 +84,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, activeView, setActiveVie
   const menuItems = rawMenuItems.filter(item => {
     // Employee accounts (e.g. Juan Dela Cruz) should NOT see Feedback Inbox in sidebar
     if (item.id === 'feedback' && isEmployeeAccount) return false;
+    if (item.id === 'dashboard' && user.role === Role.EMPLOYEE) return false;
 
     if (user.role === Role.ADMIN) return true;
     if (item.id === 'administration') return false; // Non-admins never get administration
