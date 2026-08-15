@@ -11,7 +11,7 @@ import {
   FileSpreadsheet,
   Sparkles,
   Send,
-  Trash2,
+  // Trash2,
   Bot,
   User,
   Copy,
@@ -20,8 +20,8 @@ import {
 } from 'lucide-react';
 import { storageService } from '../../services/storageService';
 import { Logo } from '../../assets/common/Logo.tsx';
-import { type Employee } from '../../types/types';
-import { motion } from 'motion/react';
+// import { type Employee } from '../../types/types';
+// import { motion } from 'motion/react';
 import Markdown from 'react-markdown';
 
 interface ReportsProps {

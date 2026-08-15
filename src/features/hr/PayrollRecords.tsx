@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { 
-  Download, 
-  Filter, 
+  // Download, 
+  // Filter, 
   Search, 
   Banknote, 
   Plus, 
@@ -12,7 +12,7 @@ import {
   Coins, 
   TrendingUp, 
   Calculator,
-  Calendar,
+  // Calendar,
   AlertCircle,
   Eye,
   Printer
@@ -20,7 +20,8 @@ import {
 import { storageService } from '../../services/storageService';
 import { useCurrentUser } from '../../hooks/useAuth';
 import { Logo } from '../../assets/common/Logo.tsx';
-import type { PayrollRecord, Employee } from '../../types/types';
+import type { PayrollRecord } from '../../types/types';
+// import type { Employee } from '../../types/types';
 import { motion, AnimatePresence } from 'motion/react';
 
 export const PayrollRecords: React.FC = () => {

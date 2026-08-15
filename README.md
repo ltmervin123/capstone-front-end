@@ -88,6 +88,33 @@ pnpm preview
 - Serves the built application from the `dist/` directory
 - Useful for testing the production build before deployment
 
+### Render (static site)
+
+Connect the `capstone-front-end` repo (not a parent folder). Leave **Root Directory** empty.
+
+- **Build command:** `pnpm install && pnpm build`
+- **Publish directory:** `dist`
+- **Node:** 18 or 20 (20 recommended)
+
+Set this env var on Render **before** the build (Vite inlines it at compile time):
+
+```
+VITE_API_BASE_URL=https://your-backend.onrender.com/api
+```
+
+Keep local `.env` as `VITE_API_BASE_URL=/api` so Vite’s proxy still hits `http://localhost:3000`.
+
+`pnpm build` runs `tsc -b`, which fails on unused imports (`noUnusedLocals`) and on `src/services/aiService.ts` (`@google/genai` is not installed; `process.env` is not typed in the Vite app config).
+
+**Temporary deploy workaround (current `development` branch):** unused Lucide/type imports are commented in:
+
+- `src/features/admin/AdminDashboard.tsx`
+- `src/features/hr/PayrollRecords.tsx`
+- `src/features/hr/Reports.tsx`
+- `src/features/layout/Sidebar.tsx`
+
+The Gemini client in `src/services/aiService.ts` is fully commented out so `tsc` can pass. Nothing in the app imported it. AI Search stays disabled until that file is restored with `@google/genai` and `import.meta.env.VITE_GEMINI_API_KEY` (do not put a Gemini secret in the browser bundle without a backend proxy).
+
 ### Linting
 
 Check code quality and style:
