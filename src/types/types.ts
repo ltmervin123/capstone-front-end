@@ -139,6 +139,7 @@ export enum ApplicantStatus {
   APPLIED = 'Applied',
   INTERVIEWING = 'Interviewing',
   OFFERED = 'Offered',
+  HIRED = 'Accepted/Hired',
   REJECTED = 'Rejected'
 }
 

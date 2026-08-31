@@ -27,6 +27,8 @@ function statusBadgeClass(status: ApplicantStatus) {
       return 'bg-amber-50 text-amber-600';
     case ApplicantStatus.OFFERED:
       return 'bg-emerald-50 text-emerald-600';
+    case ApplicantStatus.HIRED:
+      return 'bg-green-100 text-green-800';
     default:
       return 'bg-rose-50 text-rose-600';
   }
@@ -60,6 +62,7 @@ export const TalentAcquisition: React.FC = () => {
     applied: applicants.filter((applicant) => applicant.status === ApplicantStatus.APPLIED).length,
     interviewing: applicants.filter((applicant) => applicant.status === ApplicantStatus.INTERVIEWING).length,
     offered: applicants.filter((applicant) => applicant.status === ApplicantStatus.OFFERED).length,
+    hired: applicants.filter((applicant) => applicant.status === ApplicantStatus.HIRED).length,
     rejected: applicants.filter((applicant) => applicant.status === ApplicantStatus.REJECTED).length,
   };
 
@@ -229,6 +232,7 @@ export const TalentAcquisition: React.FC = () => {
           { label: 'Applied', count: stats.applied, value: ApplicantStatus.APPLIED },
           { label: 'Interviewing', count: stats.interviewing, value: ApplicantStatus.INTERVIEWING },
           { label: 'Offered', count: stats.offered, value: ApplicantStatus.OFFERED },
+          { label: 'Accepted/Hired', count: stats.hired, value: ApplicantStatus.HIRED },
           { label: 'Rejected', count: stats.rejected, value: ApplicantStatus.REJECTED },
         ].map((pipeline) => (
           <button
