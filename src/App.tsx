@@ -17,7 +17,6 @@ import { TalentAcquisition } from './features/hr/TalentAcquisition';
 import { FeedbackInbox } from './features/hr/FeedbackInbox.tsx';
 import { FeedbackModal } from './assets/common/FeedbackModal.tsx';
 import { AdminDashboard } from './features/admin/AdminDashboard';
-import { Logo } from './assets/common/Logo';
 import { type User, Role } from './types/types.ts';
 import { motion, AnimatePresence } from 'motion/react';
 import { MessageSquare } from 'lucide-react';
@@ -212,17 +211,6 @@ export default function App() {
         isOpen={isFeedbackModalOpen}
         onClose={() => setIsFeedbackModalOpen(false)}
       />
-      
-      {/* Footer Branding */}
-      <footer className="fixed bottom-4 right-28 pointer-events-none opacity-20 hidden lg:block">
-        <div className="flex items-center gap-3 justify-end">
-          <Logo className="w-8 h-8" />
-          <div className="text-right">
-            <p className="text-4xl font-black text-green-900 tracking-tighter leading-none">NMC-HR</p>
-            <p className="text-[10px] font-bold text-green-700 uppercase tracking-widest mt-1">Enterprise Core v1.0</p>
-          </div>
-        </div>
-      </footer>
     </div>
   );
 }
