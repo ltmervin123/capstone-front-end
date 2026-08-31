@@ -68,7 +68,20 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveView }) => {
     color: EDUCATION_COLORS[edu.level] || 'bg-gray-400',
   }));
   const recruitmentStats = summary.recruitment;
-  const generatedAt = new Date(summary.generatedAt).toISOString().replace('T', ' ').slice(0, 19);
+  const generatedDate = new Date(summary.generatedAt);
+  const datePart = generatedDate.toLocaleDateString('en-PH', {
+    timeZone: 'Asia/Manila',
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+  const timePart = generatedDate.toLocaleTimeString('en-PH', {
+    timeZone: 'Asia/Manila',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  });
+  const generatedAt = `${datePart} at ${timePart}`;
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500 pb-16">
@@ -89,7 +102,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveView }) => {
         </div>
         <div className="flex items-center gap-2">
           <span className="text-xs text-gray-500 font-mono tracking-tight bg-white border border-gray-100 rounded-xl px-3.5 py-1.5 shadow-sm">
-            UTC: {generatedAt}
+            Updated {generatedAt}
           </span>
         </div>
       </header>
