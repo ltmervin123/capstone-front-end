@@ -354,7 +354,7 @@ export const EmployeeManager: React.FC = () => {
                     <select 
                       value={filterStatus}
                       onChange={(e) => setFilterStatus(e.target.value)}
-                      className="w-32 bg-gray-50 border-none rounded-[24px] py-4 px-6 outline-none focus:ring-2 focus:ring-yellow-400 font-bold text-green-900 cursor-pointer"
+                      className="min-w-[11.5rem] bg-gray-50 border-none rounded-[24px] py-4 pl-6 pr-10 outline-none focus:ring-2 focus:ring-yellow-400 font-bold text-green-900 cursor-pointer"
                     >
                       <option value="All">All Status</option>
                       <option value="Active">Active</option>
