@@ -11,16 +11,64 @@ import {
   Filter,
   Check,
   X,
-  // AlertCircle,
-  // Settings,
+  AlertCircle,
+  Loader2,
   Activity
 } from 'lucide-react';
-import { storageService } from '../../services/storageService';
-import { type User, Role } from '../../types/types';
+import {
+  useAdminAuditLogsQuery,
+  useAdminUsersQuery,
+  useApproveUser,
+  useCreateStaffUser,
+  useDeleteUser,
+  useUpdateUserPermissions,
+  useUpdateUserStatus,
+} from '../../hooks/useAdminUsers';
+import { useCurrentUser } from '../../hooks/useAuth';
+import { ApiRequestError } from '../../utils/apiClient';
+import { Role, type UserPermissions } from '../../types/types';
 import { motion } from 'motion/react';
 
+const DEFAULT_HR_PERMISSIONS: UserPermissions = {
+  dashboard: true,
+  employees: true,
+  attendance: true,
+  payroll: false,
+  leaves: true,
+  talentAcquisition: true,
+  aiSearch: false,
+  reports: false,
+};
+
 export const AdminDashboard: React.FC = () => {
-  const [users, setUsers] = useState<User[]>([]);
+  const currentUser = useCurrentUser();
+  const usersQuery = useAdminUsersQuery();
+  const auditLogsQuery = useAdminAuditLogsQuery();
+  const createStaffUser = useCreateStaffUser();
+  const approveUser = useApproveUser();
+  const updateUserStatus = useUpdateUserStatus();
+  const updateUserPermissions = useUpdateUserPermissions();
+  const deleteUser = useDeleteUser();
+
+  const users = usersQuery.data ?? [];
+  const logs = auditLogsQuery.data ?? [];
+  const listLoading = usersQuery.isPending;
+  const actionBusy =
+    createStaffUser.isPending ||
+    approveUser.isPending ||
+    updateUserStatus.isPending ||
+    updateUserPermissions.isPending ||
+    deleteUser.isPending;
+  const listError =
+    usersQuery.error instanceof ApiRequestError
+      ? usersQuery.error.message
+      : usersQuery.error instanceof Error
+        ? usersQuery.error.message
+        : usersQuery.error
+          ? 'Failed to load users.'
+          : null;
+
+  const [actionError, setActionError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'registry' | 'approvals' | 'logs'>('registry');
   
   // Registry Filters
@@ -37,31 +85,11 @@ export const AdminDashboard: React.FC = () => {
     email: '', 
     password: '',
     isAdmin: false,
-    permissions: {
-      dashboard: true,
-      employees: true,
-      attendance: true,
-      payroll: false,
-      leaves: true,
-      talentAcquisition: true,
-      aiSearch: false,
-      reports: false,
-    }
+    permissions: { ...DEFAULT_HR_PERMISSIONS },
   });
 
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
-  const [editingPermissions, setEditingPermissions] = useState<{
-    dashboard: boolean;
-    employees: boolean;
-    attendance: boolean;
-    payroll: boolean;
-    leaves: boolean;
-    talentAcquisition: boolean;
-    aiSearch: boolean;
-    reports: boolean;
-  } | null>(null);
-
-  const logs = storageService.getLogs();
+  const [editingPermissions, setEditingPermissions] = useState<UserPermissions | null>(null);
 
   // Filter approved vs pending
   const approvedUsers = useMemo(() => {
@@ -87,120 +115,94 @@ export const AdminDashboard: React.FC = () => {
     return logs.filter(l => {
       return l.username.toLowerCase().includes(logSearchQuery.toLowerCase()) ||
              l.action.toLowerCase().includes(logSearchQuery.toLowerCase()) ||
-             l.details.toLowerCase().includes(logSearchQuery.toLowerCase());
+             (l.details ?? '').toLowerCase().includes(logSearchQuery.toLowerCase());
     });
   }, [logs, logSearchQuery]);
 
-  // Actions
-  const handleToggleStatus = (userId: string) => {
-    const updated = users.map(u => {
-      if (u.id === userId) return { ...u, isActive: !u.isActive };
-      return u;
-    });
-    setUsers(updated);
-    const u = updated.find(x => x.id === userId);
-    if (u) {
-      storageService.addLog('Admin', `${u.isActive ? 'Activated' : 'Disabled'} user: ${u.username}`);
+  const mutationErrorMessage = (error: unknown, fallback: string) =>
+    error instanceof ApiRequestError
+      ? error.message
+      : error instanceof Error
+        ? error.message
+        : fallback;
+
+  const handleToggleStatus = async (userId: string) => {
+    const target = users.find((user) => user.id === userId);
+    if (!target) return;
+    setActionError(null);
+    try {
+      await updateUserStatus.mutateAsync({ id: userId, isActive: !target.isActive });
+    } catch (error) {
+      setActionError(mutationErrorMessage(error, 'Failed to update user status.'));
     }
   };
 
-  const handleApprove = (userId: string) => {
-    const defaultHRAuth = {
-      dashboard: true,
-      employees: true,
-      attendance: true,
-      payroll: false,
-      leaves: true,
-      talentAcquisition: true,
-      aiSearch: false,
-      reports: false,
-    };
-    const updated = users.map(u => {
-      if (u.id === userId) return { ...u, isApproved: true, permissions: u.permissions || defaultHRAuth };
-      return u;
-    });
-    setUsers(updated);
-    const u = updated.find(x => x.id === userId);
-    if (u) {
-      storageService.addLog('Admin', `Approved user register request: ${u.username}`);
+  const handleApprove = async (userId: string) => {
+    setActionError(null);
+    try {
+      await approveUser.mutateAsync(userId);
+    } catch (error) {
+      setActionError(mutationErrorMessage(error, 'Failed to approve user.'));
     }
   };
 
-  const handleDecline = (userId: string) => {
-    const u = users.find(x => x.id === userId);
-    if (u) {
-      const updated = users.filter(x => x.id !== userId);
-      setUsers(updated);
-      storageService.addLog('Admin', `Declined and deleted registration: ${u.username}`);
+  const handleDecline = async (userId: string) => {
+    const target = users.find((user) => user.id === userId);
+    if (!target) return;
+    const confirmed = window.confirm(`Decline and delete registration for ${target.username}?`);
+    if (!confirmed) return;
+    setActionError(null);
+    try {
+      await deleteUser.mutateAsync(userId);
+    } catch (error) {
+      setActionError(mutationErrorMessage(error, 'Failed to decline user.'));
     }
   };
 
-  const handleDeleteUser = (userId: string) => {
-    const u = users.find(x => x.id === userId);
-    if (u) {
-      if (u.role === Role.ADMIN) {
-        alert('Cannot delete primary administrator.');
-        return;
-      }
-      const updated = users.filter(x => x.id !== userId);
-      setUsers(updated);
-      storageService.addLog('Admin', `Deleted user account: ${u.username}`);
+  const handleDeleteUser = async (userId: string) => {
+    const target = users.find((user) => user.id === userId);
+    if (!target) return;
+    if (target.id === currentUser?.id) {
+      setActionError('You cannot delete your own account.');
+      return;
+    }
+    const confirmed = window.confirm(`Delete user ${target.username}? This cannot be undone.`);
+    if (!confirmed) return;
+    setActionError(null);
+    try {
+      await deleteUser.mutateAsync(userId);
+    } catch (error) {
+      setActionError(mutationErrorMessage(error, 'Failed to delete user.'));
     }
   };
 
-  const handleCreateUser = (e: React.FormEvent) => {
+  const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (users.some(u => u.username.toLowerCase() === newUser.username.toLowerCase())) {
-       alert('Username already exists!');
-       return;
-    }
-    
-    // Passwords limitation validation
+    setActionError(null);
     if (newUser.password.length < 6) {
-      alert('Password must be at least 6 characters long for system security limits.');
+      setActionError('Password must be at least 6 characters long for system security limits.');
       return;
     }
 
-    const newUserRecord: User = {
-      id: Math.random().toString(36).substr(2, 9),
-      username: newUser.username,
-      email: newUser.email,
-      password: newUser.password,
-      role: newUser.isAdmin ? Role.ADMIN : Role.HR,
-      isActive: true,
-      isApproved: true,
-      createdAt: Date.now(),
-      permissions: newUser.isAdmin ? {
-        dashboard: true,
-        employees: true,
-        attendance: true,
-        payroll: true,
-        leaves: true,
-        talentAcquisition: true,
-        aiSearch: true,
-        reports: true,
-      } : newUser.permissions
-    };
-    const updated = [...users, newUserRecord];
-    setUsers(updated);
-    storageService.addLog('Admin', `Created new user: ${newUserRecord.username}`, `Admin: ${newUserRecord.role === Role.ADMIN}`);
-    setNewUser({ 
-      username: '', 
-      email: '', 
-      password: '',
-      isAdmin: false,
-      permissions: {
-        dashboard: true,
-        employees: true,
-        attendance: true,
-        payroll: false,
-        leaves: true,
-        talentAcquisition: true,
-        aiSearch: false,
-        reports: false,
-      }
-    });
-    setIsAddingUser(false);
+    try {
+      await createStaffUser.mutateAsync({
+        username: newUser.username,
+        email: newUser.email,
+        password: newUser.password,
+        role: newUser.isAdmin ? 'ADMIN' : 'HR',
+        permissions: newUser.isAdmin ? undefined : newUser.permissions,
+      });
+      setNewUser({
+        username: '',
+        email: '',
+        password: '',
+        isAdmin: false,
+        permissions: { ...DEFAULT_HR_PERMISSIONS },
+      });
+      setIsAddingUser(false);
+    } catch (error) {
+      setActionError(mutationErrorMessage(error, 'Failed to create user.'));
+    }
   };
 
   const handleInlinePermissionChange = (field: keyof typeof newUser.permissions, val: boolean) => {
@@ -220,24 +222,16 @@ export const AdminDashboard: React.FC = () => {
     }
   };
 
-  const handleSaveInlinePermissions = (userId: string) => {
+  const handleSaveInlinePermissions = async (userId: string) => {
     if (!editingPermissions) return;
-    const updated = users.map(u => {
-      if (u.id === userId) {
-        return {
-          ...u,
-          permissions: editingPermissions
-        };
-      }
-      return u;
-    });
-    setUsers(updated);
-    const target = updated.find(x => x.id === userId);
-    if (target) {
-      storageService.addLog('Admin', `Updated access rule limits for: ${target.username}`);
+    setActionError(null);
+    try {
+      await updateUserPermissions.mutateAsync({ id: userId, permissions: editingPermissions });
+      setEditingUserId(null);
+      setEditingPermissions(null);
+    } catch (error) {
+      setActionError(mutationErrorMessage(error, 'Failed to update permissions.'));
     }
-    setEditingUserId(null);
-    setEditingPermissions(null);
   };
 
   const stats = [
@@ -278,6 +272,26 @@ export const AdminDashboard: React.FC = () => {
           </button>
         )}
       </header>
+
+      {(listError || actionError) && (
+        <div className="flex items-start gap-3 p-4 bg-red-50 rounded-2xl border border-red-100 text-red-800 text-xs">
+          <AlertCircle size={18} className="shrink-0 text-red-600 mt-0.5" />
+          <div className="flex-1">
+            <span className="font-bold">{listError ?? actionError}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setActionError(null);
+              void usersQuery.refetch();
+              void auditLogsQuery.refetch();
+            }}
+            className="text-[10px] font-black uppercase tracking-wider text-red-700 hover:underline"
+          >
+            Retry
+          </button>
+        </div>
+      )}
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
@@ -353,7 +367,7 @@ export const AdminDashboard: React.FC = () => {
                 <h3 className="font-black text-green-950 uppercase text-sm tracking-tight">System User Onboarding</h3>
               </div>
 
-              <form onSubmit={handleCreateUser} className="space-y-6">
+                  <form onSubmit={(e) => void handleCreateUser(e)} className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-6 animate-in fade-in duration-300">
                   <div>
                     <label className="block text-[10px] font-black text-yellow-900 uppercase tracking-widest mb-2">Username</label>
@@ -453,7 +467,9 @@ export const AdminDashboard: React.FC = () => {
 
                 <div className="flex gap-3 justify-end">
                   <button type="button" onClick={() => setIsAddingUser(false)} className="px-6 py-3 bg-white text-green-950 border border-yellow-250 rounded-xl font-black uppercase text-xs tracking-wider hover:bg-gray-50 active:scale-95 transition-all cursor-pointer">Cancel</button>
-                  <button type="submit" className="px-8 py-3 bg-green-900 text-yellow-400 font-black rounded-xl uppercase text-xs tracking-wider hover:bg-green-950 active:scale-95 transition-all cursor-pointer shadow-md">Add Account</button>
+                  <button type="submit" disabled={actionBusy} className="px-8 py-3 bg-green-900 text-yellow-400 font-black rounded-xl uppercase text-xs tracking-wider hover:bg-green-950 active:scale-95 transition-all cursor-pointer shadow-md disabled:opacity-60">
+                    {createStaffUser.isPending ? 'Saving...' : 'Add Account'}
+                  </button>
                 </div>
               </form>
             </motion.div>
@@ -481,6 +497,7 @@ export const AdminDashboard: React.FC = () => {
                 <option value="All">All Roles</option>
                 <option value={Role.ADMIN}>Administrators Only</option>
                 <option value={Role.HR}>HR Staff Only</option>
+                <option value={Role.EMPLOYEE}>Employees Only</option>
               </select>
             </div>
           </div>
@@ -498,7 +515,17 @@ export const AdminDashboard: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
-                  {filteredApprovedUsers.map(u => {
+                  {listLoading && (
+                    <tr>
+                      <td colSpan={4} className="px-8 py-20 text-center">
+                        <div className="flex flex-col items-center gap-3 text-green-900">
+                          <Loader2 size={32} className="animate-spin" />
+                          <p className="font-black uppercase text-xs tracking-[0.3em]">Loading users...</p>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                  {!listLoading && filteredApprovedUsers.map(u => {
                     const isEditing = editingUserId === u.id;
                     return (
                       <React.Fragment key={u.id}>
@@ -551,26 +578,16 @@ export const AdminDashboard: React.FC = () => {
                                       })
                                   )}
                                 </div>
-                                {u.id !== 'admin-1' && (
                                   <button
+                                    type="button"
                                     onClick={() => {
                                       setEditingUserId(u.id);
-                                      setEditingPermissions(u.permissions || {
-                                        dashboard: true,
-                                        employees: true,
-                                        attendance: true,
-                                        payroll: false,
-                                        leaves: true,
-                                        talentAcquisition: true,
-                                        aiSearch: false,
-                                        reports: false,
-                                      });
+                                      setEditingPermissions(u.permissions || { ...DEFAULT_HR_PERMISSIONS });
                                     }}
                                     className="text-[10px] text-green-900 font-extrabold uppercase tracking-tight hover:underline flex items-center gap-1 self-start transition-all"
                                   >
                                     ⚙️ Adjust Access Rules
                                   </button>
-                                )}
                               </div>
                             )}
                           </td>
@@ -585,18 +602,22 @@ export const AdminDashboard: React.FC = () => {
                           <td className="px-8 py-5 text-right">
                             <div className="flex items-center justify-end gap-3 opacity-0 group-hover:opacity-100 transition-all">
                               <button 
-                                onClick={() => handleToggleStatus(u.id)}
-                                className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest cursor-pointer transition-colors ${
+                                type="button"
+                                onClick={() => void handleToggleStatus(u.id)}
+                                disabled={actionBusy || u.id === currentUser?.id}
+                                className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest cursor-pointer transition-colors disabled:opacity-50 ${
                                   u.isActive ? 'bg-red-50 text-red-650 hover:bg-red-100' : 'bg-green-50 text-green-700 hover:bg-green-100'
                                 }`}
                               >
                                 {u.isActive ? 'Suspend' : 'Activate'}
                               </button>
                               
-                              {u.id !== 'admin-1' && (
+                              {u.id !== currentUser?.id && (
                                 <button 
-                                  onClick={() => handleDeleteUser(u.id)}
-                                  className="p-2.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all cursor-pointer"
+                                  type="button"
+                                  onClick={() => void handleDeleteUser(u.id)}
+                                  disabled={actionBusy}
+                                  className="p-2.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all cursor-pointer disabled:opacity-50"
                                   title="Delete Account"
                                 >
                                   <Trash2 size={16} />
@@ -626,7 +647,8 @@ export const AdminDashboard: React.FC = () => {
                                       Cancel
                                     </button>
                                     <button 
-                                      onClick={() => handleSaveInlinePermissions(u.id)}
+                                      onClick={() => void handleSaveInlinePermissions(u.id)}
+                                      disabled={actionBusy}
                                       className="px-4 py-1.5 bg-green-900 text-yellow-400 rounded-lg text-[10px] font-black uppercase tracking-wider hover:bg-green-850 cursor-pointer shadow-sm"
                                     >
                                       Apply Changes
@@ -663,7 +685,7 @@ export const AdminDashboard: React.FC = () => {
                       </React.Fragment>
                     );
                   })}
-                  {filteredApprovedUsers.length === 0 && (
+                  {!listLoading && filteredApprovedUsers.length === 0 && (
                     <tr>
                       <td colSpan={4} className="px-8 py-20 text-center">
                         <div className="flex flex-col items-center gap-3 opacity-35">
@@ -710,7 +732,7 @@ export const AdminDashboard: React.FC = () => {
                       </td>
                       <td className="px-8 py-5">
                         <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-[0.05em] bg-yellow-100 text-yellow-800">
-                          {u.role === Role.ADMIN ? 'Administrator' : 'HR Staff'}
+                          {u.role === Role.ADMIN ? 'Administrator' : u.role === Role.EMPLOYEE ? 'Employee' : 'HR Staff'}
                         </span>
                       </td>
                       <td className="px-8 py-5">
@@ -724,16 +746,20 @@ export const AdminDashboard: React.FC = () => {
                       <td className="px-8 py-5 text-right">
                         <div className="flex items-center justify-end gap-3">
                           <button 
-                            onClick={() => handleApprove(u.id)}
-                            className="flex items-center gap-1.5 px-4 py-2 bg-green-900 hover:bg-green-950 text-yellow-400 font-bold rounded-xl text-xs uppercase cursor-pointer shadow-md transition-all active:scale-95"
+                            type="button"
+                            onClick={() => void handleApprove(u.id)}
+                            disabled={actionBusy}
+                            className="flex items-center gap-1.5 px-4 py-2 bg-green-900 hover:bg-green-950 text-yellow-400 font-bold rounded-xl text-xs uppercase cursor-pointer shadow-md transition-all active:scale-95 disabled:opacity-50"
                           >
-                            <Check size={14} />
+                            {approveUser.isPending ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
                             Approve
                           </button>
                           
                           <button 
-                            onClick={() => handleDecline(u.id)}
-                            className="flex items-center gap-1.5 px-4 py-2 bg-red-50 hover:bg-red-100 text-red-650 font-bold rounded-xl text-xs uppercase cursor-pointer border border-red-100 transition-all active:scale-95"
+                            type="button"
+                            onClick={() => void handleDecline(u.id)}
+                            disabled={actionBusy}
+                            className="flex items-center gap-1.5 px-4 py-2 bg-red-50 hover:bg-red-100 text-red-650 font-bold rounded-xl text-xs uppercase cursor-pointer border border-red-100 transition-all active:scale-95 disabled:opacity-50"
                           >
                             <X size={14} />
                             Decline
