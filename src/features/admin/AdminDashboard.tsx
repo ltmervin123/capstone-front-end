@@ -27,6 +27,7 @@ import {
 import { useCurrentUser } from '../../hooks/useAuth';
 import { ApiRequestError } from '../../utils/apiClient';
 import { Role, type UserPermissions } from '../../types/types';
+import { Logo } from '../../assets/common/Logo';
 import { motion } from 'motion/react';
 
 const DEFAULT_HR_PERMISSIONS: UserPermissions = {
@@ -245,11 +246,7 @@ export const AdminDashboard: React.FC = () => {
       {/* Header */}
       <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
-          <img 
-            src="https://normi.edu.ph/wp-content/uploads/2021/04/NMC-Logo.png" 
-            alt="NMC Logo" 
-            className="w-12 h-12 object-contain"
-          />
+          <Logo className="w-12 h-12" />
           <div>
             <div className="flex items-center gap-3 mb-1">
               <h1 className="text-3xl font-black text-green-950 uppercase tracking-tighter">Administration</h1>

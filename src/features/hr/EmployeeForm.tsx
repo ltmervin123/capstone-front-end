@@ -6,6 +6,7 @@ import { ApiRequestError } from '../../utils/apiClient';
 import { useCreateEmployee, useUpdateEmployee } from '../../hooks/useEmployees';
 import { createEmployeeFormSchema } from '../../schemas/employee.schema';
 import { motion, AnimatePresence } from 'motion/react';
+import { Logo } from '../../assets/common/Logo';
 
 type ChecklistCategory = keyof NonNullable<Employee['checklist']>;
 type AttachmentCategory = keyof NonNullable<Employee['attachments']>;
@@ -502,11 +503,7 @@ export const EmployeeForm: React.FC<EmployeeFormProps> = ({ employee, onCancel, 
       <div className="bg-white rounded-3xl border border-gray-100 shadow-xl overflow-hidden">
         <div className="bg-green-900 px-8 py-6 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <img 
-              src="https://normi.edu.ph/wp-content/uploads/2021/04/NMC-Logo.png" 
-              alt="NMC Logo" 
-              className="w-12 h-12 object-contain bg-white rounded-lg p-1"
-            />
+            <Logo className="w-12 h-12 bg-white rounded-lg p-1" />
             <div>
               <h1 className="text-2xl font-black text-yellow-400 uppercase tracking-tight">
                 {title || (employee ? 'Edit Employee Profile' : 'Add Employee Registration')}
