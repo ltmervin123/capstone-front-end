@@ -438,6 +438,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveView }) => {
                     { label: 'Applied', count: recruitmentStats.applied, pct: recruitmentStats.appliedPct, colorClass: 'bg-blue-500 text-white' },
                     { label: 'Interviewing', count: recruitmentStats.interviewing, pct: recruitmentStats.interviewingPct, colorClass: 'bg-indigo-500 text-white' },
                     { label: 'Offered', count: recruitmentStats.offered, pct: recruitmentStats.offeredPct, colorClass: 'bg-green-600 text-white' },
+                    { label: 'Accepted/Hired', count: recruitmentStats.hired, pct: recruitmentStats.hiredPct, colorClass: 'bg-green-800 text-white' },
                     { label: 'Rejected', count: recruitmentStats.rejected, pct: recruitmentStats.rejectedPct, colorClass: 'bg-rose-500 text-white' },
                   ].map((stage) => (
                     <div 

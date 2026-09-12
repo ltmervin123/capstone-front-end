@@ -55,11 +55,13 @@ export interface DashboardSummary {
     applied: number;
     interviewing: number;
     offered: number;
+    hired: number;
     rejected: number;
     total: number;
     appliedPct: number;
     interviewingPct: number;
     offeredPct: number;
+    hiredPct: number;
     rejectedPct: number;
   };
 }
