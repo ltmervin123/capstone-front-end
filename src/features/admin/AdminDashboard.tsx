@@ -13,7 +13,8 @@ import {
   X,
   AlertCircle,
   Loader2,
-  Activity
+  Activity,
+  KeyRound
 } from 'lucide-react';
 import {
   useAdminAuditLogsQuery,
@@ -21,12 +22,13 @@ import {
   useApproveUser,
   useCreateStaffUser,
   useDeleteUser,
+  useUpdateUserPassword,
   useUpdateUserPermissions,
   useUpdateUserStatus,
 } from '../../hooks/useAdminUsers';
 import { useCurrentUser } from '../../hooks/useAuth';
 import { ApiRequestError } from '../../utils/apiClient';
-import { Role, type UserPermissions } from '../../types/types';
+import { Role, type User, type UserPermissions } from '../../types/types';
 import { Logo } from '../../assets/common/Logo';
 import { motion } from 'motion/react';
 
@@ -49,6 +51,7 @@ export const AdminDashboard: React.FC = () => {
   const approveUser = useApproveUser();
   const updateUserStatus = useUpdateUserStatus();
   const updateUserPermissions = useUpdateUserPermissions();
+  const updateUserPassword = useUpdateUserPassword();
   const deleteUser = useDeleteUser();
 
   const users = usersQuery.data ?? [];
@@ -59,6 +62,7 @@ export const AdminDashboard: React.FC = () => {
     approveUser.isPending ||
     updateUserStatus.isPending ||
     updateUserPermissions.isPending ||
+    updateUserPassword.isPending ||
     deleteUser.isPending;
   const listError =
     usersQuery.error instanceof ApiRequestError
@@ -91,6 +95,9 @@ export const AdminDashboard: React.FC = () => {
 
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [editingPermissions, setEditingPermissions] = useState<UserPermissions | null>(null);
+  const [passwordTarget, setPasswordTarget] = useState<User | null>(null);
+  const [resetPassword, setResetPassword] = useState('');
+  const [confirmResetPassword, setConfirmResetPassword] = useState('');
 
   // Filter approved vs pending
   const approvedUsers = useMemo(() => {
@@ -232,6 +239,35 @@ export const AdminDashboard: React.FC = () => {
       setEditingPermissions(null);
     } catch (error) {
       setActionError(mutationErrorMessage(error, 'Failed to update permissions.'));
+    }
+  };
+
+  const closePasswordModal = () => {
+    setPasswordTarget(null);
+    setResetPassword('');
+    setConfirmResetPassword('');
+  };
+
+  const handleResetUserPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!passwordTarget) return;
+    setActionError(null);
+
+    if (resetPassword.length < 6) {
+      setActionError('Password must be at least 6 characters long for system security limits.');
+      return;
+    }
+
+    if (resetPassword !== confirmResetPassword) {
+      setActionError('New password and confirmation do not match.');
+      return;
+    }
+
+    try {
+      await updateUserPassword.mutateAsync({ id: passwordTarget.id, password: resetPassword });
+      closePasswordModal();
+    } catch (error) {
+      setActionError(mutationErrorMessage(error, 'Failed to update user password.'));
     }
   };
 
@@ -598,6 +634,25 @@ export const AdminDashboard: React.FC = () => {
                           </td>
                           <td className="px-8 py-5 text-right">
                             <div className="flex items-center justify-end gap-3 opacity-0 group-hover:opacity-100 transition-all">
+                              {(u.role === Role.HR || u.role === Role.EMPLOYEE) && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setActionError(null);
+                                    setPasswordTarget(u);
+                                    setResetPassword('');
+                                    setConfirmResetPassword('');
+                                  }}
+                                  disabled={actionBusy}
+                                  className="px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest cursor-pointer bg-green-50 text-green-800 hover:bg-green-100 disabled:opacity-50"
+                                  title="Set a new password"
+                                >
+                                  <span className="inline-flex items-center gap-1">
+                                    <KeyRound size={12} />
+                                    Password
+                                  </span>
+                                </button>
+                              )}
                               <button 
                                 type="button"
                                 onClick={() => void handleToggleStatus(u.id)}
@@ -861,6 +916,69 @@ export const AdminDashboard: React.FC = () => {
                 </tbody>
               </table>
             </div>
+          </div>
+        </div>
+      )}
+
+      {passwordTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="w-full max-w-md bg-white rounded-3xl border border-gray-100 shadow-2xl overflow-hidden">
+            <div className="bg-green-900 px-6 py-5 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-yellow-400 rounded-xl">
+                  <KeyRound size={18} className="text-green-950" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-black text-yellow-400 uppercase tracking-tight">Set Password</h2>
+                  <p className="text-[10px] font-bold text-green-300 uppercase tracking-widest mt-0.5">
+                    {passwordTarget.username} · {passwordTarget.role}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={closePasswordModal}
+                className="p-2 text-green-300 hover:text-white transition-colors"
+                aria-label="Close set password"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <form onSubmit={(e) => void handleResetUserPassword(e)} className="p-6 space-y-4">
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-green-800 mb-2">New password</label>
+                <input
+                  type="password"
+                  value={resetPassword}
+                  onChange={(e) => setResetPassword(e.target.value)}
+                  className="w-full px-4 py-3 bg-green-50/50 border border-green-100 rounded-xl focus:ring-2 focus:ring-yellow-400 outline-none"
+                  autoComplete="new-password"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-green-800 mb-2">Confirm password</label>
+                <input
+                  type="password"
+                  value={confirmResetPassword}
+                  onChange={(e) => setConfirmResetPassword(e.target.value)}
+                  className="w-full px-4 py-3 bg-green-50/50 border border-green-100 rounded-xl focus:ring-2 focus:ring-yellow-400 outline-none"
+                  autoComplete="new-password"
+                />
+              </div>
+              {actionError && (
+                <div className="flex items-center gap-2 p-3 bg-red-50 text-red-600 rounded-xl text-sm font-semibold border border-red-100">
+                  <AlertCircle size={16} />
+                  {actionError}
+                </div>
+              )}
+              <button
+                type="submit"
+                disabled={actionBusy}
+                className="w-full py-3 bg-green-900 text-yellow-400 rounded-xl font-black uppercase tracking-wider text-sm shadow-lg hover:bg-green-800 disabled:opacity-70"
+              >
+                {updateUserPassword.isPending ? 'Updating...' : 'Save password'}
+              </button>
+            </form>
           </div>
         </div>
       )}

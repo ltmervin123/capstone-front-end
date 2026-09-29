@@ -61,6 +61,15 @@ export function useUpdateUserPermissions() {
   });
 }
 
+export function useUpdateUserPassword() {
+  const invalidate = useInvalidateAdmin();
+  return useMutation({
+    mutationFn: (params: { id: string; password: string }) =>
+      adminService.updateUserPassword(params.id, params.password),
+    onSuccess: invalidate,
+  });
+}
+
 export function useDeleteUser() {
   const invalidate = useInvalidateAdmin();
   return useMutation({

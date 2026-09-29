@@ -60,3 +60,10 @@ export function useLogout() {
 export function useCurrentUser() {
   return useAuthStore((state) => state.user);
 }
+
+export function useChangePassword() {
+  return useMutation({
+    mutationFn: (payload: { currentPassword: string; newPassword: string }) =>
+      authService.changePassword(payload),
+  });
+}

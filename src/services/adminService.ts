@@ -97,6 +97,17 @@ export const adminService = {
     return mapUser(response.data.user);
   },
 
+  async updateUserPassword(id: string, password: string): Promise<User> {
+    const response = await apiRequest<ApiSuccessResponse<UserPayload>>(
+      `/users/${encodeURIComponent(id)}/password`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({ password }),
+      },
+    );
+    return mapUser(response.data.user);
+  },
+
   async deleteUser(id: string): Promise<{ id: string }> {
     const response = await apiRequest<ApiSuccessResponse<{ id: string }>>(
       `/users/${encodeURIComponent(id)}`,

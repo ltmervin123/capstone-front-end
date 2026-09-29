@@ -77,4 +77,11 @@ export const authService = {
       }
     }
   },
+
+  async changePassword(payload: { currentPassword: string; newPassword: string }): Promise<void> {
+    await apiRequest<ApiSuccessResponse<{ message?: string }>>('/auth/password', {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    });
+  },
 };

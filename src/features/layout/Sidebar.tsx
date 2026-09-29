@@ -16,11 +16,13 @@ import {
   BarChart3,
   ArrowUpRight,
   TrendingUp,
-  MessageSquare
+  MessageSquare,
+  KeyRound
 } from 'lucide-react';
 import { Role } from "../../types/types";
 import type { User } from '../../types/types';
 import { Logo } from '../../assets/common/Logo';
+import { ChangePasswordModal } from '../auth/ChangePasswordModal';
 
 interface SidebarProps {
   user: User;
@@ -31,6 +33,7 @@ interface SidebarProps {
 
 export const Sidebar: React.FC<SidebarProps> = ({ user, activeView, setActiveView, onLogout }) => {
   const [isOpen, setIsOpen] = useState(typeof window !== 'undefined' ? window.innerWidth >= 1024 : true);
+  const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
 
   useEffect(() => {
     const handleResize = () => {
@@ -192,6 +195,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, activeView, setActiveVie
               </div>
             </div>
             <button
+              onClick={() => setIsChangePasswordOpen(true)}
+              className="w-full flex items-center justify-center gap-2 px-4 py-2 mb-2 text-sm font-bold bg-green-800 text-yellow-400 rounded-xl hover:bg-green-700 transition-colors"
+            >
+              <KeyRound size={16} />
+              Change Password
+            </button>
+            <button
               onClick={onLogout}
               className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-bold bg-yellow-400 text-green-950 rounded-xl hover:bg-yellow-300 transition-colors shadow-md"
             >
@@ -201,6 +211,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, activeView, setActiveVie
           </div>
         </div>
       </aside>
+
+      <ChangePasswordModal
+        isOpen={isChangePasswordOpen}
+        onClose={() => setIsChangePasswordOpen(false)}
+      />
     </>
   );
 };
