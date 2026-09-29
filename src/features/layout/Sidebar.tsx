@@ -130,7 +130,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, activeView, setActiveVie
       <aside className={`
         fixed inset-y-0 left-0 z-40 w-64 bg-green-900 text-white transform transition-transform duration-300 ease-in-out
         ${isOpen ? 'translate-x-0' : '-translate-x-full'}
-        lg:translate-x-0 lg:static lg:inset-0
+        lg:translate-x-0 lg:static lg:h-screen lg:shrink-0
       `}>
         <div className="flex flex-col h-full">
           {/* Logo Section */}
@@ -184,7 +184,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, activeView, setActiveVie
           </nav>
 
           {/* User Section */}
-          <div className="p-4 border-t border-green-800">
+          <div className="p-4 border-t border-green-800 shrink-0">
             <div className="flex items-center gap-3 p-3 bg-green-800/50 rounded-xl mb-4">
               <div className="w-10 h-10 rounded-full bg-yellow-500 flex items-center justify-center font-bold text-green-950 text-lg">
                 {user.username.charAt(0).toUpperCase()}

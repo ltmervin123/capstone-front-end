@@ -158,7 +158,7 @@ export default function App() {
   };
 
   return (
-    <div className="flex min-h-screen bg-[#fdfcf0] text-green-950 font-sans selection:bg-yellow-200 selection:text-green-900">
+    <div className="flex h-screen overflow-hidden bg-[#fdfcf0] text-green-950 font-sans selection:bg-yellow-200 selection:text-green-900">
       <Sidebar 
         user={currentUser} 
         activeView={activeView} 
@@ -166,7 +166,7 @@ export default function App() {
         onLogout={handleLogout} 
       />
       
-      <main className="flex-1 overflow-x-hidden">
+      <main className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
         <div className="max-w-[1400px] xl:max-w-[1600px] 2xl:max-w-[1800px] mx-auto pt-20 px-4 pb-6 lg:p-10">
           <AnimatePresence mode="wait">
             <motion.div

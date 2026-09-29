@@ -1,14 +1,17 @@
 import React, { useState, useRef } from 'react';
 import { Plus, Search, Filter, Edit2, Trash2, Printer, X, Eye, Users, History, Activity, Download, Upload, AlertCircle, ArrowRight, Loader2, Fingerprint } from 'lucide-react';
-import { type Employee, DEPARTMENTS } from '../../types/types';
+import { type Employee, DEPARTMENTS, Role } from '../../types/types';
 import { storageService } from '../../services/storageService';
 import { ApiRequestError } from '../../utils/apiClient';
 import { useEmployeesQuery, useDeleteEmployee } from '../../hooks/useEmployees';
+import { useCurrentUser } from '../../hooks/useAuth';
 import { EmployeeForm } from './EmployeeForm';
 import { Logo } from '../../assets/common/Logo.tsx';
 import { motion, AnimatePresence } from 'motion/react';
 
 export const EmployeeManager: React.FC = () => {
+  const currentUser = useCurrentUser();
+  const canViewAuditLogs = currentUser?.role === Role.ADMIN;
   const [view, setView] = useState<'list' | 'form'>('list');
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [formTitle, setFormTitle] = useState<string | undefined>(undefined);
@@ -286,7 +289,7 @@ export const EmployeeManager: React.FC = () => {
               </div>
             </div>
 
-            {/* Sub-header Tab Bar */}
+            {canViewAuditLogs && (
             <div className="flex border-b border-gray-100 gap-6 mt-4">
               <button 
                 onClick={() => setActiveTab('directory')}
@@ -311,8 +314,9 @@ export const EmployeeManager: React.FC = () => {
                 )}
               </button>
             </div>
+            )}
 
-            {activeTab === 'directory' ? (
+            {activeTab !== 'logs' || !canViewAuditLogs ? (
               <>
                 {listError && (
                   <div className="flex items-start gap-3 p-4 bg-red-50 rounded-2xl border border-red-100 text-red-800 text-xs">
