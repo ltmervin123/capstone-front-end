@@ -1,3 +1,5 @@
+import { refreshAuthSession } from '../utils/apiClient';
+
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '/api';
 
 export interface ChatMessage {
@@ -18,7 +20,7 @@ export async function streamAiChat(
   callbacks: StreamCallbacks,
   signal?: AbortSignal
 ): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/ai/chat/stream`, {
+  let response = await fetch(`${API_BASE_URL}/ai/chat/stream`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -27,6 +29,21 @@ export async function streamAiChat(
     body: JSON.stringify({ message, history }),
     signal,
   });
+
+  if (response.status === 401) {
+    const refreshed = await refreshAuthSession();
+    if (refreshed) {
+      response = await fetch(`${API_BASE_URL}/ai/chat/stream`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({ message, history }),
+        signal,
+      });
+    }
+  }
 
   if (!response.ok) {
     let errorMessage = `Server error (${response.status})`;

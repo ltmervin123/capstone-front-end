@@ -1,6 +1,7 @@
 import type { LoginFormValues } from '../features/auth/login.schema';
 import { Role, type User, type UserPermissions } from '../types/types';
-import { apiRequest, type ApiSuccessResponse } from '../utils/apiClient';
+import { apiRequest, setSessionRefresher, type ApiSuccessResponse } from '../utils/apiClient';
+import { useAuthStore } from '../stores/authStore';
 
 interface AuthUserResponse {
   id: string;
@@ -38,11 +39,14 @@ async function fetchCurrentUser(): Promise<User> {
   return mapAuthUserToUser(response.data.user);
 }
 
+let activeRefreshPromise: Promise<User> | null = null;
+
 export const authService = {
   async login(credentials: LoginFormValues): Promise<User> {
     const response = await apiRequest<ApiSuccessResponse<AuthUserPayload>>('/auth/login', {
       method: 'POST',
       body: JSON.stringify(credentials),
+      skipAuthRefresh: true,
     });
 
     return mapAuthUserToUser(response.data.user);
@@ -51,15 +55,31 @@ export const authService = {
   async logout(): Promise<void> {
     await apiRequest<ApiSuccessResponse<{ message?: string }>>('/auth/logout', {
       method: 'POST',
+      skipAuthRefresh: true,
     });
   },
 
   async refreshSession(): Promise<User> {
-    const response = await apiRequest<ApiSuccessResponse<AuthUserPayload>>('/auth/refresh', {
-      method: 'POST',
-    });
+    if (activeRefreshPromise) {
+      return activeRefreshPromise;
+    }
 
-    return mapAuthUserToUser(response.data.user);
+    activeRefreshPromise = (async () => {
+      try {
+        const response = await apiRequest<ApiSuccessResponse<AuthUserPayload>>('/auth/refresh', {
+          method: 'POST',
+          skipAuthRefresh: true,
+        });
+
+        const user = mapAuthUserToUser(response.data.user);
+        useAuthStore.getState().setUser(user);
+        return user;
+      } finally {
+        activeRefreshPromise = null;
+      }
+    })();
+
+    return activeRefreshPromise;
   },
 
   async getCurrentUser(): Promise<User> {
@@ -73,6 +93,7 @@ export const authService = {
       try {
         return await authService.refreshSession();
       } catch {
+        useAuthStore.getState().clearAuth();
         return null;
       }
     }
@@ -85,3 +106,14 @@ export const authService = {
     });
   },
 };
+
+setSessionRefresher(async () => {
+  try {
+    await authService.refreshSession();
+    return true;
+  } catch {
+    useAuthStore.getState().clearAuth();
+    return false;
+  }
+});
+

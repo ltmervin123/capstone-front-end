@@ -41,9 +41,50 @@ async function parseResponseBody(response: Response): Promise<unknown> {
   }
 }
 
+export interface ApiRequestOptions extends RequestInit {
+  skipAuthRefresh?: boolean;
+  _retry?: boolean;
+}
+
+type SessionRefresher = () => Promise<boolean>;
+
+let sessionRefresher: SessionRefresher | null = null;
+let refreshPromise: Promise<boolean> | null = null;
+
+export function setSessionRefresher(refresher: SessionRefresher): void {
+  sessionRefresher = refresher;
+}
+
+export async function refreshAuthSession(): Promise<boolean> {
+  if (!sessionRefresher) {
+    return false;
+  }
+
+  if (refreshPromise) {
+    return refreshPromise;
+  }
+
+  refreshPromise = sessionRefresher().finally(() => {
+    refreshPromise = null;
+  });
+
+  return refreshPromise;
+}
+
+const AUTH_EXCLUDED_PATHS = ['/auth/login', '/auth/refresh', '/auth/logout'];
+
+function shouldSkipRefresh(path: string, options: ApiRequestOptions): boolean {
+  if (options.skipAuthRefresh || options._retry) {
+    return true;
+  }
+
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+  return AUTH_EXCLUDED_PATHS.some((excluded) => normalizedPath.startsWith(excluded));
+}
+
 export async function apiRequest<T>(
   path: string,
-  options: RequestInit = {},
+  options: ApiRequestOptions = {},
 ): Promise<T> {
   const headers = new Headers(options.headers);
 
@@ -58,6 +99,16 @@ export async function apiRequest<T>(
     headers,
   });
 
+  if (response.status === 401 && !shouldSkipRefresh(path, options)) {
+    const refreshed = await refreshAuthSession();
+    if (refreshed) {
+      return apiRequest<T>(path, {
+        ...options,
+        _retry: true,
+      });
+    }
+  }
+
   const body = await parseResponseBody(response);
 
   if (!response.ok) {
@@ -69,3 +120,4 @@ export async function apiRequest<T>(
 
   return body as T;
 }
+
