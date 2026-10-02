@@ -1,58 +1,99 @@
-// Temporarily disabled so `tsc -b` / Render can build without @google/genai.
-// import { GoogleGenAI } from "@google/genai";
-// import type { Employee } from "../types/types";
-//
-// function getApiKey(): string {
-//   const apiKey = process.env.GEMINI_API_KEY;
-//   if (!apiKey) {
-//     throw new Error(
-//       "GEMINI_API_KEY is not set. Add it to your environment variables (e.g. .env file) before starting the app."
-//     );
-//   }
-//   return apiKey;
-// }
-//
-// const ai = new GoogleGenAI({ apiKey: getApiKey() });
-//
-// export const aiService = {
-//   async queryEmployees(query: string, employees: Employee[]) {
-//     try {
-//       // Prepare context from employees
-//       const employeeContext = employees.map(e => ({
-//         id: e.id,
-//         name: `${e.firstName} ${e.middleName ? e.middleName + ' ' : ''}${e.surname}`,
-//         department: e.department,
-//         position: e.position,
-//         sex: e.sex,
-//         dob: e.dateOfBirth,
-//         hireDate: e.employmentDate
-//       }));
-//
-//       const systemInstruction = `
-//         You are the NMC-HR AI Assistant. You have access to the following employee database:
-//         ${JSON.stringify(employeeContext, null, 2)}
-//
-//         Rules:
-//         1. Answer the user's query clearly and concisely based ONLY on the provided data.
-//         2. If asking for a list, use a markdown table.
-//         3. For retirement eligibility, assume retirement age is 60.
-//         4. If the information is not in the database, say you don't have that record.
-//         5. Provide a summary if appropriate.
-//       `;
-//
-//       const response = await ai.models.generateContent({
-//         model: "gemini-3-flash-preview",
-//         contents: query,
-//         config: {
-//           systemInstruction: systemInstruction,
-//           temperature: 0.2, // Low temperature for factual consistency
-//         },
-//       });
-//
-//       return response.text || "No response generated.";
-//     } catch (error) {
-//       console.error("AI Query Error:", error);
-//       return "I'm sorry, I encountered an error while processing your request. Please check your API key or try again later.";
-//     }
-//   }
-// };
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '/api';
+
+export interface ChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+export interface StreamCallbacks {
+  onStatus?: (status: string) => void;
+  onDelta?: (delta: string) => void;
+  onDone?: (meta: { latencyMs?: number }) => void;
+  onError?: (error: Error) => void;
+}
+
+export async function streamAiChat(
+  message: string,
+  history: ChatMessage[],
+  callbacks: StreamCallbacks,
+  signal?: AbortSignal
+): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/ai/chat/stream`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    credentials: 'include',
+    body: JSON.stringify({ message, history }),
+    signal,
+  });
+
+  if (!response.ok) {
+    let errorMessage = `Server error (${response.status})`;
+    try {
+      const errorJson = (await response.json()) as { error?: { message?: string }; message?: string };
+      if (errorJson?.error?.message) {
+        errorMessage = errorJson.error.message;
+      } else if (errorJson?.message) {
+        errorMessage = errorJson.message;
+      }
+    } catch {
+      // Ignore JSON parse failure
+    }
+    throw new Error(errorMessage);
+  }
+
+  if (!response.body) {
+    throw new Error('ReadableStream not supported by browser.');
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder('utf-8');
+  let buffer = '';
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() ?? '';
+
+      let currentEvent = 'message';
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed) {
+          currentEvent = 'message';
+          continue;
+        }
+
+        if (trimmed.startsWith('event:')) {
+          currentEvent = trimmed.slice(6).trim();
+        } else if (trimmed.startsWith('data:')) {
+          const rawData = trimmed.slice(5).trim();
+          try {
+            const data = JSON.parse(rawData) as Record<string, unknown>;
+            if (currentEvent === 'status' && typeof data?.message === 'string') {
+              callbacks.onStatus?.(data.message);
+            } else if (currentEvent === 'delta' && typeof data?.text === 'string') {
+              callbacks.onDelta?.(data.text);
+            } else if (currentEvent === 'done') {
+              callbacks.onDone?.(data as { latencyMs?: number });
+            } else if (currentEvent === 'error') {
+              callbacks.onError?.(new Error((data?.error as string) || 'AI generation error'));
+            }
+          } catch {
+            // Ignore non-JSON lines
+          }
+        }
+      }
+    }
+  } catch (err) {
+    if ((err as Error)?.name === 'AbortError') {
+      return;
+    }
+    callbacks.onError?.(err instanceof Error ? err : new Error(String(err)));
+    throw err;
+  }
+}
