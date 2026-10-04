@@ -12,13 +12,14 @@ import {
   ChevronRight,
   Loader2,
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { Logo } from '../../assets/common/Logo';
 import { motion } from 'motion/react';
 import { useDashboardQuery } from '../../hooks/useDashboard';
 import { ApiRequestError } from '../../utils/apiClient';
 
 interface DashboardProps {
-  setActiveView: (view: string) => void;
+  setActiveView?: (view: string) => void;
 }
 
 const EDUCATION_COLORS: Record<string, string> = {
@@ -30,8 +31,17 @@ const EDUCATION_COLORS: Record<string, string> = {
 };
 
 export const Dashboard: React.FC<DashboardProps> = ({ setActiveView }) => {
+  const navigate = useNavigate();
   const [activeChartTab, setActiveChartTab] = useState<'all' | 'attendance' | 'department' | 'leaves'>('all');
   const dashboardQuery = useDashboardQuery();
+
+  const handleNavigate = (pathOrView: string) => {
+    if (setActiveView) {
+      setActiveView(pathOrView.replace(/^\//, ''));
+    }
+    const targetPath = pathOrView.startsWith('/') ? pathOrView : `/${pathOrView}`;
+    navigate(targetPath);
+  };
 
   const summary = dashboardQuery.data;
   const listError =
@@ -117,7 +127,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveView }) => {
           <motion.div 
             key={i}
             whileHover={{ y: -4 }}
-            onClick={() => setActiveView(stat.viewTarget)}
+            onClick={() => handleNavigate(stat.viewTarget)}
             className="p-4 bg-white rounded-3xl border border-gray-100 shadow-sm flex flex-col items-center justify-center text-center group cursor-pointer transition-all hover:border-yellow-200"
           >
             <div className={`p-3 rounded-2xl ${stat.bg} ${stat.text} mb-2 group-hover:scale-110 transition-transform`}>
@@ -176,8 +186,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveView }) => {
                     </div>
                   </div>
                   <button 
-                    onClick={() => setActiveView('attendance')}
-                    className="flex items-center gap-0.5 text-[10px] font-black text-green-700 uppercase tracking-wider hover:text-green-900"
+                    onClick={() => handleNavigate('/attendance')}
+                    className="flex items-center gap-0.5 text-[10px] font-black text-green-700 uppercase tracking-wider hover:text-green-900 cursor-pointer"
                   >
                     Manage
                     <ChevronRight size={12} />
@@ -240,8 +250,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveView }) => {
                     </div>
                   </div>
                   <button 
-                    onClick={() => setActiveView('employees')}
-                    className="flex items-center gap-0.5 text-[10px] font-black text-green-700 uppercase tracking-wider hover:text-green-900"
+                    onClick={() => handleNavigate('/employees')}
+                    className="flex items-center gap-0.5 text-[10px] font-black text-green-700 uppercase tracking-wider hover:text-green-900 cursor-pointer"
                   >
                     View Staff
                     <ChevronRight size={12} />
@@ -303,8 +313,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveView }) => {
                     </div>
                   </div>
                   <button 
-                    onClick={() => setActiveView('leaves')}
-                    className="flex items-center gap-0.5 text-[10px] font-black text-green-700 uppercase tracking-wider hover:text-green-900"
+                    onClick={() => handleNavigate('/leaves')}
+                    className="flex items-center gap-0.5 text-[10px] font-black text-green-700 uppercase tracking-wider hover:text-green-900 cursor-pointer"
                   >
                     Approvals
                     <ChevronRight size={12} />
@@ -444,7 +454,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveView }) => {
                     <div 
                       key={stage.label} 
                       className="flex items-center justify-between p-2.5 bg-gray-50 border border-gray-100 rounded-2xl relative overflow-hidden group hover:bg-white hover:border-blue-100 cursor-pointer transition-all"
-                      onClick={() => setActiveView('talent-acquisition')}
+                      onClick={() => handleNavigate('/talent-acquisition')}
                     >
                       <div className="flex items-center gap-2 z-10">
                         <span className={`text-[10px] font-black px-2 py-0.5 rounded-lg ${stage.colorClass}`}>

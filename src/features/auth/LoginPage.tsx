@@ -1,21 +1,32 @@
 import React, { useState } from 'react';
 import { Lock, User as UserIcon, AlertCircle, Eye, EyeOff } from 'lucide-react';
 import { motion } from 'motion/react';
+import { useNavigate, useLocation, Navigate } from 'react-router-dom';
+import { useAuthStore } from '../../stores/authStore';
 import { Logo } from '../../assets/common/Logo';
 import { useLogin } from '../../hooks/useAuth';
 import { loginSchema } from './login.schema';
 import { ApiRequestError } from '../../utils/apiClient';
 
 interface LoginPageProps {
-  onLoginSuccess: () => void;
+  onLoginSuccess?: () => void;
 }
 
 export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const currentUser = useAuthStore((state) => state.user);
+  const isInitialized = useAuthStore((state) => state.isInitialized);
+
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const loginMutation = useLogin();
+
+  if (isInitialized && currentUser) {
+    return <Navigate to="/" replace />;
+  }
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,7 +40,12 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
 
     try {
       await loginMutation.mutateAsync(parsed.data);
-      onLoginSuccess();
+      if (onLoginSuccess) {
+        onLoginSuccess();
+      }
+      const state = location.state as { from?: { pathname?: string } } | null;
+      const fromPath = state?.from?.pathname || '/';
+      navigate(fromPath, { replace: true });
     } catch (err) {
       if (err instanceof ApiRequestError) {
         setError(err.message);

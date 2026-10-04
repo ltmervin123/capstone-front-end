@@ -1,39 +1,29 @@
 import React, { useState, useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { 
-  Users, 
-  UserPlus, 
   LogOut, 
-  LayoutDashboard, 
-  // Settings,
-  ShieldCheck,
-  // History,
   Menu,
   X,
-  Banknote,
-  CalendarDays,
-  Clock,
-  BarChart3,
-  ArrowUpRight,
-  TrendingUp,
-  MessageSquare,
   KeyRound,
-  Bot
 } from 'lucide-react';
-import { Role } from "../../types/types";
-import type { User } from '../../types/types';
 import { Logo } from '../../assets/common/Logo';
 import { ChangePasswordModal } from '../auth/ChangePasswordModal';
+import { useAuthStore } from '../../stores/authStore';
+import { useLogout } from '../../hooks/useAuth';
+import { getSidebarRoutes } from '../../routes/landingPolicy';
 
 interface SidebarProps {
-  user: User;
-  activeView: string;
-  setActiveView: (view: string) => void;
-  onLogout: () => void;
+  className?: string;
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ user, activeView, setActiveView, onLogout }) => {
+export const Sidebar: React.FC<SidebarProps> = () => {
   const [isOpen, setIsOpen] = useState(typeof window !== 'undefined' ? window.innerWidth >= 1024 : true);
   const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  const user = useAuthStore((state) => state.user);
+  const logoutMutation = useLogout();
 
   useEffect(() => {
     const handleResize = () => {
@@ -44,69 +34,32 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, activeView, setActiveVie
       }
     };
     window.addEventListener('resize', handleResize);
-    // Initial call
     handleResize();
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  const handleNavClick = (viewId: string) => {
-    setActiveView(viewId);
+  if (!user) return null;
+
+  const menuItems = getSidebarRoutes(user);
+
+  const handleNavClick = (path: string) => {
+    navigate(path);
     if (window.innerWidth < 1024) {
       setIsOpen(false);
     }
   };
 
-  const hrMenuItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'employees', label: 'Employee Manager', icon: Users },
-    { id: 'attendance', label: 'Attendance', icon: Clock },
-    { id: 'payroll', label: 'Payroll', icon: Banknote },
-    { id: 'leaves', label: 'Leave Records', icon: CalendarDays },
-    { id: 'talent-acquisition', label: 'Talent Acquisition', icon: UserPlus },
-    { id: 'feedback', label: 'Feedback Inbox', icon: MessageSquare },
-    { id: 'ai-search', label: 'AI Chat', icon: Bot },
-    { 
-      id: 'reports', 
-      label: 'Reports', 
-      icon: BarChart3,
-      subItems: [
-        { id: 'employment-report', label: 'Employment Report', icon: ArrowUpRight },
-        { id: 'promotion-report', label: 'Promotion Report', icon: TrendingUp },
-      ]
-    },
-  ];
+  const handleLogout = () => {
+    logoutMutation.mutate();
+    navigate('/login');
+  };
 
-  const adminMenuItems = [
-    { id: 'administration', label: 'Administration', icon: ShieldCheck },
-  ];
-
-  const rawMenuItems = user.role === Role.ADMIN ? [hrMenuItems[0], ...adminMenuItems, ...hrMenuItems.slice(1)] : hrMenuItems;
-
-  const isEmployeeAccount = !!user.employeeId || user.role === Role.EMPLOYEE;
-
-  const menuItems = rawMenuItems.filter(item => {
-    // Employee accounts (e.g. Juan Dela Cruz) should NOT see Feedback Inbox in sidebar
-    if (item.id === 'feedback' && isEmployeeAccount) return false;
-    if (item.id === 'dashboard' && user.role === Role.EMPLOYEE) return false;
-
-    if (user.role === Role.ADMIN) return true;
-    if (item.id === 'administration') return false; // Non-admins never get administration
-    
-    const p = user.permissions;
-    if (!p) return true; // fallback to show if no permissions object is present at all
-
-    if (item.id === 'dashboard') return p.dashboard !== false;
-    if (item.id === 'employees') return p.employees !== false;
-    if (item.id === 'attendance') return p.attendance !== false;
-    if (item.id === 'payroll') return p.payroll !== false;
-    if (item.id === 'leaves') return p.leaves !== false;
-    if (item.id === 'talent-acquisition') return p.talentAcquisition !== false;
-    if (item.id === 'ai-search') return p.aiSearch !== false;
-    if (item.id === 'reports') return p.reports !== false;
-    if (item.id === 'feedback') return p.feedback !== false;
-    
-    return true;
-  });
+  const isRouteActive = (path: string, exact: boolean = false) => {
+    if (exact || path === '/dashboard') {
+      return location.pathname === path;
+    }
+    return location.pathname === path || location.pathname.startsWith(`${path}/`);
+  };
 
   return (
     <>
@@ -134,7 +87,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, activeView, setActiveVie
       `}>
         <div className="flex flex-col h-full">
           {/* Logo Section */}
-          <div className="p-6 bg-green-950 flex items-center gap-4 group cursor-pointer">
+          <div 
+            onClick={() => handleNavClick('/')}
+            className="p-6 bg-green-950 flex items-center gap-4 group cursor-pointer"
+          >
             <Logo className="w-12 h-12" />
             <div>
               <h1 className="text-xl font-black tracking-tight text-white uppercase leading-none">NMC-HR</h1>
@@ -144,43 +100,53 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, activeView, setActiveVie
 
           {/* Navigation */}
           <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
-            {menuItems.map((item) => (
-              <React.Fragment key={item.id}>
-                <button
-                  onClick={() => handleNavClick(item.id)}
-                  className={`
-                    w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group
-                    ${activeView === item.id 
-                      ? 'bg-yellow-400 text-green-950 font-bold shadow-lg shadow-yellow-900/20' 
-                      : 'text-green-100 hover:bg-green-800 hover:text-white'}
-                  `}
-                >
-                  <item.icon size={20} className={activeView === item.id ? 'text-green-900' : 'text-yellow-500 opacity-70 group-hover:opacity-100 transition-opacity'} />
-                  <span className="flex-1 text-left">{item.label}</span>
-                </button>
-                
-                {/* Sub Items */}
-                {(item as any).subItems && (
-                  <div className="ml-6 space-y-1 mt-1 mb-2">
-                    {(item as any).subItems.map((sub: any) => (
-                      <button
-                        key={sub.id}
-                        onClick={() => handleNavClick(sub.id)}
-                        className={`
-                          w-full flex items-center gap-3 px-4 py-2 rounded-lg transition-all duration-200 group text-xs
-                          ${activeView === sub.id 
-                            ? 'bg-yellow-400/20 text-yellow-400 font-bold' 
-                            : 'text-green-300 hover:bg-green-800 hover:text-white'}
-                        `}
-                      >
-                        <sub.icon size={14} className={activeView === sub.id ? 'text-yellow-400' : 'text-yellow-500 opacity-50 group-hover:opacity-100'} />
-                        <span>{sub.label}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </React.Fragment>
-            ))}
+            {menuItems.map((item) => {
+              const active = isRouteActive(item.path, item.path === '/dashboard');
+              const Icon = item.icon;
+
+              return (
+                <React.Fragment key={item.id}>
+                  <button
+                    onClick={() => handleNavClick(item.path)}
+                    className={`
+                      w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group cursor-pointer
+                      ${active 
+                        ? 'bg-yellow-400 text-green-950 font-bold shadow-lg shadow-yellow-900/20' 
+                        : 'text-green-100 hover:bg-green-800 hover:text-white'}
+                    `}
+                  >
+                    <Icon size={20} className={active ? 'text-green-900' : 'text-yellow-500 opacity-70 group-hover:opacity-100 transition-opacity'} />
+                    <span className="flex-1 text-left">{item.label}</span>
+                  </button>
+                  
+                  {/* Sub Items */}
+                  {item.subItems && (
+                    <div className="ml-6 space-y-1 mt-1 mb-2">
+                      {item.subItems.map((sub) => {
+                        const subActive = location.pathname === sub.path;
+                        const SubIcon = sub.icon;
+
+                        return (
+                          <button
+                            key={sub.id}
+                            onClick={() => handleNavClick(sub.path)}
+                            className={`
+                              w-full flex items-center gap-3 px-4 py-2 rounded-lg transition-all duration-200 group text-xs cursor-pointer
+                              ${subActive 
+                                ? 'bg-yellow-400/20 text-yellow-400 font-bold' 
+                                : 'text-green-300 hover:bg-green-800 hover:text-white'}
+                            `}
+                          >
+                            <SubIcon size={14} className={subActive ? 'text-yellow-400' : 'text-yellow-500 opacity-50 group-hover:opacity-100'} />
+                            <span>{sub.label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </React.Fragment>
+              );
+            })}
           </nav>
 
           {/* User Section */}
@@ -196,14 +162,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, activeView, setActiveVie
             </div>
             <button
               onClick={() => setIsChangePasswordOpen(true)}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2 mb-2 text-sm font-bold bg-green-800 text-yellow-400 rounded-xl hover:bg-green-700 transition-colors"
+              className="w-full flex items-center justify-center gap-2 px-4 py-2 mb-2 text-sm font-bold bg-green-800 text-yellow-400 rounded-xl hover:bg-green-700 transition-colors cursor-pointer"
             >
               <KeyRound size={16} />
               Change Password
             </button>
             <button
-              onClick={onLogout}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-bold bg-yellow-400 text-green-950 rounded-xl hover:bg-yellow-300 transition-colors shadow-md"
+              onClick={handleLogout}
+              className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-bold bg-yellow-400 text-green-950 rounded-xl hover:bg-yellow-300 transition-colors shadow-md cursor-pointer"
             >
               <LogOut size={16} />
               Logout
