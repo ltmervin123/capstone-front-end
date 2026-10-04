@@ -12,12 +12,12 @@ import {
   Banknote,
   CalendarDays,
   Clock,
-  Search,
   BarChart3,
   ArrowUpRight,
   TrendingUp,
   MessageSquare,
-  KeyRound
+  KeyRound,
+  Bot
 } from 'lucide-react';
 import { Role } from "../../types/types";
 import type { User } from '../../types/types';
@@ -64,7 +64,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, activeView, setActiveVie
     { id: 'leaves', label: 'Leave Records', icon: CalendarDays },
     { id: 'talent-acquisition', label: 'Talent Acquisition', icon: UserPlus },
     { id: 'feedback', label: 'Feedback Inbox', icon: MessageSquare },
-    { id: 'ai-search', label: 'AI Search', icon: Search },
+    { id: 'ai-search', label: 'AI Chat', icon: Bot },
     { 
       id: 'reports', 
       label: 'Reports', 
