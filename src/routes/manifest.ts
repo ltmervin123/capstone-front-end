@@ -9,8 +9,6 @@ import {
   MessageSquare,
   Bot,
   BarChart3,
-  ArrowUpRight,
-  TrendingUp,
   ShieldCheck,
 } from 'lucide-react';
 import { Role, type User, type UserPermissions } from '../types/types';
@@ -95,7 +93,8 @@ export const ROUTE_MANIFEST: RouteItem[] = [
     icon: MessageSquare,
     roles: [Role.ADMIN, Role.HR],
     permissionKey: 'feedback',
-    showInSidebar: (user: User) => !user.employeeId && user.role !== Role.EMPLOYEE,
+    showInSidebar: (user: User) =>
+      !user.employeeId && user.role !== Role.EMPLOYEE,
   },
   {
     id: 'ai-chat',
@@ -112,9 +111,5 @@ export const ROUTE_MANIFEST: RouteItem[] = [
     icon: BarChart3,
     roles: [Role.ADMIN, Role.HR],
     permissionKey: 'reports',
-    subItems: [
-      { id: 'employment-report', path: '/reports/employment', label: 'Employment Report', icon: ArrowUpRight },
-      { id: 'promotion-report', path: '/reports/promotion', label: 'Promotion Report', icon: TrendingUp },
-    ],
   },
 ];
