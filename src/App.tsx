@@ -46,7 +46,8 @@ export default function App() {
     clearLegacyMockDataOnce();
   }, []);
 
-  const getRouteItem = (id: string) => ROUTE_MANIFEST.find((item) => item.id === id);
+  const getRouteItem = (id: string) =>
+    ROUTE_MANIFEST.find((item) => item.id === id);
 
   return (
     <BrowserRouter>
@@ -163,10 +164,22 @@ export default function App() {
           />
 
           {/* Legacy navigation aliases for backward compatibility */}
-          <Route path="/ai-search" element={<Navigate to="/ai-chat" replace />} />
-          <Route path="/add-employee" element={<Navigate to="/employees" replace />} />
-          <Route path="/employment-report" element={<Navigate to="/reports/employment" replace />} />
-          <Route path="/promotion-report" element={<Navigate to="/reports/promotion" replace />} />
+          <Route
+            path="/ai-search"
+            element={<Navigate to="/ai-chat" replace />}
+          />
+          <Route
+            path="/add-employee"
+            element={<Navigate to="/employees" replace />}
+          />
+          <Route
+            path="/employment-report"
+            element={<Navigate to="/reports/employment" replace />}
+          />
+          <Route
+            path="/promotion-report"
+            element={<Navigate to="/reports/promotion" replace />}
+          />
 
           {/* Catch-all 404 inside layout */}
           <Route path="*" element={<NotFoundPage />} />
