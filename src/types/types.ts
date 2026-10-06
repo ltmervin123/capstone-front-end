@@ -55,6 +55,7 @@ export interface Employee {
   doctorateStatus: string;
   mastersDegreeName: string;
   educationLevel: string;
+  promotionYear?: string;
   profilePicture?: string;
   checklist?: {
     personalInfo: { [key: string]: boolean };
@@ -89,22 +90,70 @@ export interface AuditLog {
   timestamp: number;
 }
 
+export enum PayrollRunStatus {
+  DRAFT = 'DRAFT',
+  ATTENDANCE_LOCKED = 'ATTENDANCE_LOCKED',
+  CALCULATED = 'CALCULATED',
+  PUBLISHED = 'PUBLISHED',
+}
+
+export enum CutoffType {
+  MONTHLY = 'MONTHLY',
+  FIRST_HALF = 'FIRST_HALF',
+  SECOND_HALF = 'SECOND_HALF',
+  CUSTOM = 'CUSTOM',
+}
+
+export interface PayrollRun {
+  id: string;
+  name: string;
+  cutoffType: CutoffType;
+  startDate: string;
+  endDate: string;
+  status: PayrollRunStatus;
+  totalGross: number;
+  totalDeductions: number;
+  totalNet: number;
+  recordCount: number;
+  processedBy: string;
+  publishedAt?: string | null;
+  createdAt: string;
+}
+
 export interface PayrollRecord {
   id: string;
+  payrollRunId?: string | null;
+  payrollRunName?: string;
   employeeId: string;
+  employeeDbId?: string;
   employeeName: string;
+  position?: string;
+  department?: string;
   month: string;
   year: number;
+  startDate?: string | null;
+  endDate?: string | null;
+  status: 'DRAFT' | 'PUBLISHED';
+  functionalRate: number;
+  daysWorked: number;
   basicSalary: number;
   allowances: number;
-  deductions: number;
-  cola: number; // Represents original Net Pay
-  functionalRate: number; // e.g. Daily Functional Rate
-  daysWorked: number; // e.g. Number of days worked in the period
-  cashAdvance: number; // Cash Advance balance subtracted 
-  gasoline: number; // Gasoline allowance added
-  employeeShare: number; // Government & premium share deduction
-  otherDeductions: number; // Other arbitrary deductions
+  gasoline: number;
+  grossPay: number;
+  tardinessMinutes: number;
+  tardinessDeduction: number;
+  sssDeduction: number;
+  philHealthDeduction: number;
+  pagIbigDeduction: number;
+  taxWithheld: number;
+  cashAdvance: number;
+  employeeShare: number;
+  otherDeductions: number;
+  totalDeductions: number;
+  netPay: number;
+  deductions?: number;
+  cola?: number;
+  createdAt?: string;
 }
 
 export enum LeaveType {
