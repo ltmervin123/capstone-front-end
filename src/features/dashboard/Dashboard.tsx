@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { 
-  Users, 
-  UserCheck, 
-  UserX, 
+import {
+  Users,
+  UserCheck,
+  UserX,
   CalendarDays,
   BarChart3,
   GraduationCap,
@@ -22,7 +22,8 @@ interface DashboardProps {
   setActiveView?: (view: string) => void;
 }
 
-type ChartTab = 'all' | 'attendance' | 'department' | 'leaves' | 'education' | 'recruitment';
+type ChartTab =
+  'all' | 'attendance' | 'department' | 'leaves' | 'education' | 'recruitment';
 
 const CHART_TABS: { id: ChartTab; label: string }[] = [
   { id: 'all', label: 'All Metrics' },
@@ -36,9 +37,9 @@ const CHART_TABS: { id: ChartTab; label: string }[] = [
 const EDUCATION_COLORS: Record<string, string> = {
   'Post Graduate': 'bg-emerald-700',
   "Master's Degree": 'bg-green-700',
-  'Graduate': 'bg-teal-600',
+  Graduate: 'bg-teal-600',
   'College Graduate': 'bg-amber-500',
-  'Undergraduate': 'bg-orange-400',
+  Undergraduate: 'bg-orange-400',
 };
 
 export const Dashboard: React.FC<DashboardProps> = ({ setActiveView }) => {
@@ -50,7 +51,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveView }) => {
     if (setActiveView) {
       setActiveView(pathOrView.replace(/^\//, ''));
     }
-    const targetPath = pathOrView.startsWith('/') ? pathOrView : `/${pathOrView}`;
+    const targetPath = pathOrView.startsWith('/')
+      ? pathOrView
+      : `/${pathOrView}`;
     navigate(targetPath);
   };
 
@@ -68,7 +71,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveView }) => {
     return (
       <div className="flex min-h-[40vh] items-center justify-center gap-3">
         <Loader2 className="h-8 w-8 animate-spin text-green-800" />
-        <span className="text-sm font-medium text-stone-600">Loading dashboard metrics...</span>
+        <span className="text-sm font-medium text-stone-600">
+          Loading dashboard metrics...
+        </span>
       </div>
     );
   }
@@ -76,7 +81,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveView }) => {
   if (listError || !summary) {
     return (
       <div className="max-w-xl mx-auto my-12 rounded-2xl border border-red-200 bg-white p-8 text-center shadow-xs">
-        <p className="text-sm font-semibold text-red-700">{listError ?? 'Unable to load dashboard records at this time.'}</p>
+        <p className="text-sm font-semibold text-red-700">
+          {listError ?? 'Unable to load dashboard records at this time.'}
+        </p>
         <button
           type="button"
           onClick={() => dashboardQuery.refetch()}
@@ -113,41 +120,42 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveView }) => {
   const generatedAt = `${datePart} at ${timePart}`;
 
   const statCards = [
-    { 
-      label: 'Total Staff', 
-      subtitle: 'Registered personnel', 
-      value: stats.totalEmployees, 
-      icon: Users, 
-      iconBg: 'bg-emerald-50 text-emerald-800', 
-      viewTarget: 'employees' 
+    {
+      label: 'Total Staff',
+      subtitle: 'Registered personnel',
+      value: stats.totalEmployees,
+      icon: Users,
+      iconBg: 'bg-emerald-50 text-emerald-800',
+      viewTarget: 'employees',
     },
-    { 
-      label: 'Active Personnel', 
-      subtitle: 'Currently reporting', 
-      value: stats.activeEmployees, 
-      icon: UserCheck, 
-      iconBg: 'bg-green-50 text-green-800', 
-      viewTarget: 'employees' 
+    {
+      label: 'Active Personnel',
+      subtitle: 'Currently reporting',
+      value: stats.activeEmployees,
+      icon: UserCheck,
+      iconBg: 'bg-green-50 text-green-800',
+      viewTarget: 'employees',
     },
-    { 
-      label: 'Retired Staff', 
-      subtitle: 'Completed service', 
-      value: stats.retiredEmployees, 
-      icon: UserX, 
-      iconBg: 'bg-amber-50 text-amber-900', 
-      viewTarget: 'employees' 
+    {
+      label: 'Retired Staff',
+      subtitle: 'Completed service',
+      value: stats.retiredEmployees,
+      icon: UserX,
+      iconBg: 'bg-amber-50 text-amber-900',
+      viewTarget: 'employees',
     },
-    { 
-      label: 'On Leave', 
-      subtitle: 'Approved absences', 
-      value: stats.activeLeaves, 
-      icon: CalendarDays, 
-      iconBg: 'bg-purple-50 text-purple-800', 
-      viewTarget: 'leaves' 
+    {
+      label: 'On Leave',
+      subtitle: 'Approved absences',
+      value: stats.activeLeaves,
+      icon: CalendarDays,
+      iconBg: 'bg-purple-50 text-purple-800',
+      viewTarget: 'leaves',
     },
   ];
 
-  const isTabVisible = (tab: ChartTab) => activeChartTab === 'all' || activeChartTab === tab;
+  const isTabVisible = (tab: ChartTab) =>
+    activeChartTab === 'all' || activeChartTab === tab;
   const isSingleTabActive = activeChartTab !== 'all';
 
   return (
@@ -167,7 +175,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveView }) => {
               <span className="h-1.5 w-1.5 rounded-full bg-amber-400 hidden sm:inline-block" />
               <div className="flex items-center gap-1.5 px-2.5 py-0.5 bg-green-900 text-white rounded-full shadow-xs">
                 <Users size={12} className="text-amber-300" />
-                <span className="text-[11px] font-bold tracking-wide">HR Office</span>
+                <span className="text-[11px] font-bold tracking-wide">
+                  HR Office
+                </span>
               </div>
             </div>
           </div>
@@ -182,12 +192,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveView }) => {
       </header>
 
       {/* KPI Overview Cards */}
-      <section aria-label="Key personnel metrics" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <section
+        aria-label="Key personnel metrics"
+        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"
+      >
         {statCards.map((stat, i) => (
-          <motion.div 
+          <motion.div
             key={i}
-            whileHover={{ y: -3 }}
-            onClick={() => handleNavigate(stat.viewTarget)}
             onKeyDown={(e) => {
               if (e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault();
@@ -196,15 +207,19 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveView }) => {
             }}
             role="button"
             tabIndex={0}
-            className="p-5 bg-white rounded-2xl border border-stone-200/80 shadow-xs flex flex-col items-center justify-center text-center group cursor-pointer transition-all hover:border-emerald-300 hover:shadow-md focus-visible:ring-2 focus-visible:ring-green-800 focus-visible:outline-hidden"
+            className="p-5 bg-white rounded-2xl border border-stone-200/80 shadow-xs flex flex-col items-center justify-center text-center group transition-all"
           >
-            <div className={`p-3 rounded-xl ${stat.iconBg} mb-3 group-hover:scale-105 transition-transform`}>
+            <div
+              className={`p-3 rounded-xl ${stat.iconBg} mb-3 group-hover:scale-105 transition-transform`}
+            >
               <stat.icon size={22} />
             </div>
             <h2 className="text-3xl font-extrabold text-green-950 tracking-tight tabular-nums leading-none">
               {stat.value}
             </h2>
-            <p className="text-sm font-bold text-stone-800 mt-2">{stat.label}</p>
+            <p className="text-sm font-bold text-stone-800 mt-2">
+              {stat.label}
+            </p>
             <p className="text-xs text-stone-500 mt-0.5">{stat.subtitle}</p>
           </motion.div>
         ))}
@@ -219,14 +234,15 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveView }) => {
               Operational Overview
             </h2>
             <p className="text-xs sm:text-sm text-stone-600 mt-1 max-w-2xl">
-              Live metrics across daily attendance, department headcounts, leave requests, and recruiting pipelines.
+              Live metrics across daily attendance, department headcounts, leave
+              requests, and recruiting pipelines.
             </p>
           </div>
-          
+
           {/* Tab Filter Switcher */}
-          <div 
-            role="tablist" 
-            aria-label="Filter dashboard analytics view" 
+          <div
+            role="tablist"
+            aria-label="Filter dashboard analytics view"
             className="flex items-center gap-1 bg-stone-100 border border-stone-200/80 rounded-2xl p-1 overflow-x-auto max-w-full shrink-0 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
           >
             {CHART_TABS.map((tab) => {
@@ -238,8 +254,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveView }) => {
                   aria-selected={isActive}
                   onClick={() => setActiveChartTab(tab.id)}
                   className={`px-3.5 py-1.5 min-h-[36px] rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer focus-visible:ring-2 focus-visible:ring-green-800 focus-visible:outline-hidden ${
-                    isActive 
-                      ? 'bg-green-900 text-amber-300 shadow-xs' 
+                    isActive
+                      ? 'bg-green-900 text-amber-300 shadow-xs'
                       : 'text-stone-600 hover:text-green-950 hover:bg-stone-200/60'
                   }`}
                 >
@@ -254,12 +270,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveView }) => {
         <div className="grid grid-cols-1 md:grid-cols-12 lg:grid-cols-12 gap-6">
           {/* Daily Attendance Card */}
           {isTabVisible('attendance') && (
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               className={`${
-                isSingleTabActive 
-                  ? 'col-span-1 md:col-span-12 lg:col-span-12' 
+                isSingleTabActive
+                  ? 'col-span-1 md:col-span-12 lg:col-span-12'
                   : 'col-span-1 md:col-span-12 lg:col-span-6'
               } bg-white rounded-2xl border border-stone-200/80 p-6 shadow-xs flex flex-col justify-between`}
             >
@@ -270,11 +286,15 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveView }) => {
                       <Clock size={18} />
                     </div>
                     <div>
-                      <h3 className="font-bold text-green-950 text-base">Today&apos;s Attendance</h3>
-                      <p className="text-xs text-stone-500 font-medium">Logged for {attendanceStats.dateText}</p>
+                      <h3 className="font-bold text-green-950 text-base">
+                        Today&apos;s Attendance
+                      </h3>
+                      <p className="text-xs text-stone-500 font-medium">
+                        Logged for {attendanceStats.dateText}
+                      </p>
                     </div>
                   </div>
-                  <button 
+                  <button
                     type="button"
                     onClick={() => handleNavigate('/attendance')}
                     className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-800 hover:text-green-950 hover:bg-emerald-50 px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-green-800 focus-visible:outline-hidden"
@@ -285,27 +305,59 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveView }) => {
                 </div>
 
                 <p className="text-xs text-stone-600 mb-6">
-                  Staff present, late, on leave, or absent against today&apos;s scheduled rosters. Click Manage to review timesheets.
+                  Staff present, late, on leave, or absent against today&apos;s
+                  scheduled rosters. Click Manage to review timesheets.
                 </p>
 
                 <div className="h-56 flex items-end justify-between gap-4 px-2 pt-6 pb-2">
                   {[
-                    { label: 'Present', count: attendanceStats.present, pct: attendanceStats.presentPct, colorClass: 'bg-emerald-500' },
-                    { label: 'Late', count: attendanceStats.late, pct: attendanceStats.latePct, colorClass: 'bg-amber-400' },
-                    { label: 'Absent', count: attendanceStats.absent, pct: attendanceStats.absentPct, colorClass: 'bg-rose-500' },
-                    { label: 'On Leave', count: attendanceStats.onLeave, pct: attendanceStats.onLeavePct, colorClass: 'bg-purple-500' },
+                    {
+                      label: 'Present',
+                      count: attendanceStats.present,
+                      pct: attendanceStats.presentPct,
+                      colorClass: 'bg-emerald-500',
+                    },
+                    {
+                      label: 'Late',
+                      count: attendanceStats.late,
+                      pct: attendanceStats.latePct,
+                      colorClass: 'bg-amber-400',
+                    },
+                    {
+                      label: 'Absent',
+                      count: attendanceStats.absent,
+                      pct: attendanceStats.absentPct,
+                      colorClass: 'bg-rose-500',
+                    },
+                    {
+                      label: 'On Leave',
+                      count: attendanceStats.onLeave,
+                      pct: attendanceStats.onLeavePct,
+                      colorClass: 'bg-purple-500',
+                    },
                   ].map((col, index) => (
-                    <div key={index} className="flex-1 flex flex-col items-center group h-full justify-end">
+                    <div
+                      key={index}
+                      className="flex-1 flex flex-col items-center group h-full justify-end"
+                    >
                       <div className="mb-2 text-center">
-                        <span className="block text-xs font-extrabold text-green-950 tabular-nums">{col.count}</span>
-                        <span className="block text-[11px] font-medium text-stone-500 tabular-nums">{col.pct}%</span>
+                        <span className="block text-xs font-extrabold text-green-950 tabular-nums">
+                          {col.count}
+                        </span>
+                        <span className="block text-[11px] font-medium text-stone-500 tabular-nums">
+                          {col.pct}%
+                        </span>
                       </div>
                       <div className="relative w-full flex items-end justify-center h-full">
                         <div className="absolute inset-x-0 bottom-0 top-0 bg-stone-100 rounded-xl -z-0" />
-                        <motion.div 
+                        <motion.div
                           initial={{ height: 0 }}
                           animate={{ height: `${col.pct || 4}%` }}
-                          transition={{ duration: 0.6, ease: "easeOut", delay: index * 0.08 }}
+                          transition={{
+                            duration: 0.6,
+                            ease: 'easeOut',
+                            delay: index * 0.08,
+                          }}
                           className={`w-full ${col.colorClass} rounded-xl cursor-pointer relative z-10 transition-all hover:brightness-105 shadow-xs block group-hover:scale-x-[1.03]`}
                         >
                           <div className="absolute -top-9 left-1/2 -translate-x-1/2 bg-green-950 text-white text-[11px] font-semibold py-1 px-2.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-30 shadow-md pointer-events-none">
@@ -313,7 +365,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveView }) => {
                           </div>
                         </motion.div>
                       </div>
-                      <span className="text-xs font-semibold text-stone-600 mt-2">{col.label}</span>
+                      <span className="text-xs font-semibold text-stone-600 mt-2">
+                        {col.label}
+                      </span>
                     </div>
                   ))}
                 </div>
@@ -330,12 +384,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveView }) => {
 
           {/* Department Distribution Card */}
           {isTabVisible('department') && (
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               className={`${
-                isSingleTabActive 
-                  ? 'col-span-1 md:col-span-12 lg:col-span-12' 
+                isSingleTabActive
+                  ? 'col-span-1 md:col-span-12 lg:col-span-12'
                   : 'col-span-1 md:col-span-12 lg:col-span-6'
               } bg-white rounded-2xl border border-stone-200/80 p-6 shadow-xs flex flex-col justify-between`}
             >
@@ -346,11 +400,15 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveView }) => {
                       <Building2 size={18} />
                     </div>
                     <div>
-                      <h3 className="font-bold text-green-950 text-base">Department Distribution</h3>
-                      <p className="text-xs text-stone-500 font-medium">Headcount breakdown</p>
+                      <h3 className="font-bold text-green-950 text-base">
+                        Department Distribution
+                      </h3>
+                      <p className="text-xs text-stone-500 font-medium">
+                        Headcount breakdown
+                      </p>
                     </div>
                   </div>
-                  <button 
+                  <button
                     type="button"
                     onClick={() => handleNavigate('/employees')}
                     className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-800 hover:text-green-950 hover:bg-emerald-50 px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-green-800 focus-visible:outline-hidden"
@@ -361,41 +419,55 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveView }) => {
                 </div>
 
                 <p className="text-xs text-stone-600 mb-5">
-                  Active faculty and staff distribution across academic departments and administrative offices.
+                  Active faculty and staff distribution across academic
+                  departments and administrative offices.
                 </p>
 
                 <div className="space-y-3.5 max-h-[230px] overflow-y-auto pr-1">
                   {departmentStats.length === 0 ? (
-                    <p className="text-xs text-stone-500 font-medium py-4 text-center">No employee records found.</p>
-                  ) : departmentStats.map((dept, index) => (
-                    <div key={dept.name} className="space-y-1.5">
-                      <div className="flex justify-between items-center text-xs">
-                        <span className="font-bold text-green-950">{dept.name}</span>
-                        <div className="flex items-center gap-2">
-                          <span className="text-stone-500 font-medium tabular-nums">{dept.count} Staff</span>
-                          <span className="text-emerald-800 font-bold bg-emerald-50 px-2 py-0.5 rounded text-[11px] tabular-nums">
-                            {dept.pct}%
+                    <p className="text-xs text-stone-500 font-medium py-4 text-center">
+                      No employee records found.
+                    </p>
+                  ) : (
+                    departmentStats.map((dept, index) => (
+                      <div key={dept.name} className="space-y-1.5">
+                        <div className="flex justify-between items-center text-xs">
+                          <span className="font-bold text-green-950">
+                            {dept.name}
                           </span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-stone-500 font-medium tabular-nums">
+                              {dept.count} Staff
+                            </span>
+                            <span className="text-emerald-800 font-bold bg-emerald-50 px-2 py-0.5 rounded text-[11px] tabular-nums">
+                              {dept.pct}%
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="relative w-full h-2.5 bg-stone-100 rounded-full overflow-hidden">
+                          <motion.div
+                            initial={{ width: 0 }}
+                            animate={{ width: `${dept.relativePct}%` }}
+                            transition={{
+                              duration: 0.6,
+                              ease: 'easeOut',
+                              delay: index * 0.06,
+                            }}
+                            className="h-full bg-linear-to-r from-green-800 to-emerald-600 rounded-full"
+                          />
                         </div>
                       </div>
-                      
-                      <div className="relative w-full h-2.5 bg-stone-100 rounded-full overflow-hidden">
-                        <motion.div 
-                          initial={{ width: 0 }}
-                          animate={{ width: `${dept.relativePct}%` }}
-                          transition={{ duration: 0.6, ease: "easeOut", delay: index * 0.06 }}
-                          className="h-full bg-linear-to-r from-green-800 to-emerald-600 rounded-full"
-                        />
-                      </div>
-                    </div>
-                  ))}
+                    ))
+                  )}
                 </div>
               </div>
 
               <div className="border-t border-stone-100 pt-4 mt-4 flex items-center justify-between text-xs text-stone-600">
                 <span className="font-medium">Largest Unit</span>
                 <span className="font-bold text-green-900 tabular-nums">
-                  {departmentStats[0]?.name || 'None'} ({departmentStats[0]?.count || 0} Staff)
+                  {departmentStats[0]?.name || 'None'} (
+                  {departmentStats[0]?.count || 0} Staff)
                 </span>
               </div>
             </motion.div>
@@ -403,7 +475,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveView }) => {
 
           {/* Leaves Allocation & Status Card */}
           {isTabVisible('leaves') && (
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               className="col-span-1 md:col-span-12 lg:col-span-12 bg-white rounded-2xl border border-stone-200/80 p-6 shadow-xs flex flex-col justify-between"
@@ -415,11 +487,15 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveView }) => {
                       <CalendarDays size={18} />
                     </div>
                     <div>
-                      <h3 className="font-bold text-green-950 text-base">Leave Requests</h3>
-                      <p className="text-xs text-stone-500 font-medium">Review and approvals</p>
+                      <h3 className="font-bold text-green-950 text-base">
+                        Leave Requests
+                      </h3>
+                      <p className="text-xs text-stone-500 font-medium">
+                        Review and approvals
+                      </p>
                     </div>
                   </div>
-                  <button 
+                  <button
                     type="button"
                     onClick={() => handleNavigate('/leaves')}
                     className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-800 hover:text-green-950 hover:bg-emerald-50 px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-green-800 focus-visible:outline-hidden"
@@ -430,32 +506,35 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveView }) => {
                 </div>
 
                 <p className="text-xs text-stone-600 mb-4">
-                  Summary of leave applications submitted for review, pending approvals, and type breakdown.
+                  Summary of leave applications submitted for review, pending
+                  approvals, and type breakdown.
                 </p>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
                   {/* Left: Approval Status */}
                   <div className="space-y-2">
-                    <span className="text-xs font-bold text-stone-700 block">Approval Status</span>
-                    
+                    <span className="text-xs font-bold text-stone-700 block">
+                      Approval Status
+                    </span>
+
                     <div className="w-full h-3.5 bg-stone-100 rounded-lg overflow-hidden flex shadow-inner">
-                      <div 
-                        className="bg-emerald-500 h-full transition-all" 
-                        style={{ width: `${leaveStats.approvedPct}%` }} 
-                        title={`Approved: ${leaveStats.approved} (${leaveStats.approvedPct}%)`} 
+                      <div
+                        className="bg-emerald-500 h-full transition-all"
+                        style={{ width: `${leaveStats.approvedPct}%` }}
+                        title={`Approved: ${leaveStats.approved} (${leaveStats.approvedPct}%)`}
                       />
-                      <div 
-                        className="bg-amber-400 h-full transition-all" 
-                        style={{ width: `${leaveStats.pendingPct}%` }} 
-                        title={`Pending: ${leaveStats.pending} (${leaveStats.pendingPct}%)`} 
+                      <div
+                        className="bg-amber-400 h-full transition-all"
+                        style={{ width: `${leaveStats.pendingPct}%` }}
+                        title={`Pending: ${leaveStats.pending} (${leaveStats.pendingPct}%)`}
                       />
-                      <div 
-                        className="bg-rose-500 h-full transition-all" 
-                        style={{ width: `${leaveStats.rejectedPct}%` }} 
-                        title={`Rejected: ${leaveStats.rejected} (${leaveStats.rejectedPct}%)`} 
+                      <div
+                        className="bg-rose-500 h-full transition-all"
+                        style={{ width: `${leaveStats.rejectedPct}%` }}
+                        title={`Rejected: ${leaveStats.rejected} (${leaveStats.rejectedPct}%)`}
                       />
                     </div>
-                    
+
                     <div className="flex items-center justify-between text-xs font-semibold pt-1">
                       <span className="flex items-center gap-1.5 text-emerald-700">
                         <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
@@ -474,13 +553,23 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveView }) => {
 
                   {/* Right: Requests by Leave Type */}
                   <div>
-                    <span className="text-xs font-bold text-stone-700 block mb-2">Requests by Leave Type</span>
+                    <span className="text-xs font-bold text-stone-700 block mb-2">
+                      Requests by Leave Type
+                    </span>
                     <div className="grid grid-cols-2 gap-2">
                       {leaveStats.types.slice(0, 4).map((type) => (
-                        <div key={type.type} className="p-2.5 bg-stone-50 rounded-xl border border-stone-200/60 flex flex-col justify-between">
-                          <span className="text-xs font-medium text-stone-600 truncate">{type.type}</span>
+                        <div
+                          key={type.type}
+                          className="p-2.5 bg-stone-50 rounded-xl border border-stone-200/60 flex flex-col justify-between"
+                        >
+                          <span className="text-xs font-medium text-stone-600 truncate">
+                            {type.type}
+                          </span>
                           <span className="text-sm font-bold text-green-950 mt-1 tabular-nums">
-                            {type.count} <span className="text-xs font-normal text-stone-500">({type.pct}%)</span>
+                            {type.count}{' '}
+                            <span className="text-xs font-normal text-stone-500">
+                              ({type.pct}%)
+                            </span>
                           </span>
                         </div>
                       ))}
@@ -500,12 +589,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveView }) => {
 
           {/* Education Attainment Card */}
           {isTabVisible('education') && (
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               className={`${
-                isSingleTabActive 
-                  ? 'col-span-1 md:col-span-12 lg:col-span-12' 
+                isSingleTabActive
+                  ? 'col-span-1 md:col-span-12 lg:col-span-12'
                   : 'col-span-1 md:col-span-6 lg:col-span-6'
               } bg-white rounded-2xl border border-stone-200/80 p-6 shadow-xs flex flex-col justify-between`}
             >
@@ -516,33 +605,48 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveView }) => {
                       <GraduationCap size={18} />
                     </div>
                     <div>
-                      <h3 className="font-bold text-green-950 text-base">Education Levels</h3>
-                      <p className="text-xs text-stone-500 font-medium">Academic qualifications</p>
+                      <h3 className="font-bold text-green-950 text-base">
+                        Education Levels
+                      </h3>
+                      <p className="text-xs text-stone-500 font-medium">
+                        Academic qualifications
+                      </p>
                     </div>
                   </div>
                 </div>
 
                 <p className="text-xs text-stone-600 mb-5">
-                  Highest completed qualifications recorded across faculty and administrative personnel.
+                  Highest completed qualifications recorded across faculty and
+                  administrative personnel.
                 </p>
 
                 <div className="space-y-3">
                   {educationStats.length === 0 ? (
-                    <p className="text-xs text-stone-500 font-medium py-4 text-center">No education records found.</p>
-                  ) : educationStats.map((edu) => (
-                    <div key={edu.level} className="flex items-center gap-3">
-                      <span className={`w-3 h-3 rounded-full ${edu.color} shrink-0`} />
-                      <div className="flex-1 flex items-center justify-between text-xs border-b border-stone-100 pb-2">
-                        <span className="font-medium text-stone-800 truncate">{edu.level}</span>
-                        <div className="flex items-center gap-2 tabular-nums">
-                          <span className="text-stone-500 font-medium">{edu.count} Staff</span>
-                          <span className="text-amber-900 font-bold bg-amber-100/80 text-[11px] px-2 py-0.5 rounded">
-                            {edu.pct}%
+                    <p className="text-xs text-stone-500 font-medium py-4 text-center">
+                      No education records found.
+                    </p>
+                  ) : (
+                    educationStats.map((edu) => (
+                      <div key={edu.level} className="flex items-center gap-3">
+                        <span
+                          className={`w-3 h-3 rounded-full ${edu.color} shrink-0`}
+                        />
+                        <div className="flex-1 flex items-center justify-between text-xs border-b border-stone-100 pb-2">
+                          <span className="font-medium text-stone-800 truncate">
+                            {edu.level}
                           </span>
+                          <div className="flex items-center gap-2 tabular-nums">
+                            <span className="text-stone-500 font-medium">
+                              {edu.count} Staff
+                            </span>
+                            <span className="text-amber-900 font-bold bg-amber-100/80 text-[11px] px-2 py-0.5 rounded">
+                              {edu.pct}%
+                            </span>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    ))
+                  )}
                 </div>
               </div>
 
@@ -557,12 +661,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveView }) => {
 
           {/* Recruitment Funnel Card */}
           {isTabVisible('recruitment') && (
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               className={`${
-                isSingleTabActive 
-                  ? 'col-span-1 md:col-span-12 lg:col-span-12' 
+                isSingleTabActive
+                  ? 'col-span-1 md:col-span-12 lg:col-span-12'
                   : 'col-span-1 md:col-span-6 lg:col-span-6'
               } bg-white rounded-2xl border border-stone-200/80 p-6 shadow-xs flex flex-col justify-between`}
             >
@@ -573,11 +677,15 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveView }) => {
                       <Briefcase size={18} />
                     </div>
                     <div>
-                      <h3 className="font-bold text-green-950 text-base">Recruitment Pipeline</h3>
-                      <p className="text-xs text-stone-500 font-medium">Active hiring stages</p>
+                      <h3 className="font-bold text-green-950 text-base">
+                        Recruitment Pipeline
+                      </h3>
+                      <p className="text-xs text-stone-500 font-medium">
+                        Active hiring stages
+                      </p>
                     </div>
                   </div>
-                  <button 
+                  <button
                     type="button"
                     onClick={() => handleNavigate('/talent-acquisition')}
                     className="inline-flex items-center gap-1 text-xs font-semibold text-blue-800 hover:text-blue-950 hover:bg-blue-50 px-2 py-1 rounded-lg transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-blue-800 focus-visible:outline-hidden"
@@ -588,19 +696,45 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveView }) => {
                 </div>
 
                 <p className="text-xs text-stone-600 mb-4">
-                  Active candidate volume across screening, interview rounds, and job offers.
+                  Active candidate volume across screening, interview rounds,
+                  and job offers.
                 </p>
 
                 <div className="space-y-2">
                   {[
-                    { label: 'Applied', count: recruitmentStats.applied, pct: recruitmentStats.appliedPct, badgeClass: 'bg-blue-100 text-blue-800' },
-                    { label: 'Interviewing', count: recruitmentStats.interviewing, pct: recruitmentStats.interviewingPct, badgeClass: 'bg-indigo-100 text-indigo-800' },
-                    { label: 'Offered', count: recruitmentStats.offered, pct: recruitmentStats.offeredPct, badgeClass: 'bg-emerald-100 text-emerald-800' },
-                    { label: 'Hired', count: recruitmentStats.hired, pct: recruitmentStats.hiredPct, badgeClass: 'bg-green-100 text-green-900 font-bold' },
-                    { label: 'Rejected', count: recruitmentStats.rejected, pct: recruitmentStats.rejectedPct, badgeClass: 'bg-rose-100 text-rose-800' },
+                    {
+                      label: 'Applied',
+                      count: recruitmentStats.applied,
+                      pct: recruitmentStats.appliedPct,
+                      badgeClass: 'bg-blue-100 text-blue-800',
+                    },
+                    {
+                      label: 'Interviewing',
+                      count: recruitmentStats.interviewing,
+                      pct: recruitmentStats.interviewingPct,
+                      badgeClass: 'bg-indigo-100 text-indigo-800',
+                    },
+                    {
+                      label: 'Offered',
+                      count: recruitmentStats.offered,
+                      pct: recruitmentStats.offeredPct,
+                      badgeClass: 'bg-emerald-100 text-emerald-800',
+                    },
+                    {
+                      label: 'Hired',
+                      count: recruitmentStats.hired,
+                      pct: recruitmentStats.hiredPct,
+                      badgeClass: 'bg-green-100 text-green-900 font-bold',
+                    },
+                    {
+                      label: 'Rejected',
+                      count: recruitmentStats.rejected,
+                      pct: recruitmentStats.rejectedPct,
+                      badgeClass: 'bg-rose-100 text-rose-800',
+                    },
                   ].map((stage) => (
-                    <div 
-                      key={stage.label} 
+                    <div
+                      key={stage.label}
                       onClick={() => handleNavigate('/talent-acquisition')}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' || e.key === ' ') {
@@ -613,7 +747,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveView }) => {
                       className="flex items-center justify-between p-2.5 bg-stone-50 border border-stone-200/60 rounded-xl relative overflow-hidden group hover:bg-white hover:border-blue-200 cursor-pointer transition-all focus-visible:ring-2 focus-visible:ring-blue-800 focus-visible:outline-hidden"
                     >
                       <div className="flex items-center gap-2 z-10">
-                        <span className={`text-xs font-bold px-2 py-0.5 rounded-md tabular-nums ${stage.badgeClass}`}>
+                        <span
+                          className={`text-xs font-bold px-2 py-0.5 rounded-md tabular-nums ${stage.badgeClass}`}
+                        >
                           {stage.count}
                         </span>
                         <span className="text-xs font-semibold text-green-950 group-hover:text-blue-900 transition-colors">
