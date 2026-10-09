@@ -1,8 +1,6 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   FileText,
-  Download,
-  Printer,
   BarChart3,
   CheckCircle2,
   Clock,
@@ -17,7 +15,9 @@ import {
   Award,
   Users,
   ChevronDown,
+  Loader2,
 } from 'lucide-react';
+import { motion } from 'motion/react';
 import {
   ResponsiveContainer,
   BarChart,
@@ -33,26 +33,27 @@ import {
   AreaChart,
   Area,
 } from 'recharts';
-import { Logo } from '../../assets/common/Logo.tsx';
+import { Logo } from '../../assets/common/Logo';
 import {
   useEmploymentReportQuery,
   usePromotionReportQuery,
   useAttendanceReportQuery,
   useReportFiltersQuery,
-} from '../../hooks/useReports.ts';
-import { exportToCsv, exportToJson } from '../../utils/exportUtils.ts';
+} from '../../hooks/useReports';
+import { exportToCsv } from '../../utils/exportUtils';
 import type {
   EmploymentReportRecord,
   PromotionReportRecord,
   AttendanceReportRecord,
-} from '../../services/reportService.ts';
+} from '../../services/reportService';
 
 interface ReportsProps {
   initialType?: string;
 }
 
 type ReportType = 'Employment Report' | 'Promotion Report' | 'Timely Report';
-type DatePreset = 'all' | 'this_month' | 'this_quarter' | 'this_year' | 'custom';
+type DatePreset =
+  'all' | 'this_month' | 'this_quarter' | 'this_year' | 'custom';
 
 const REPORT_OPTIONS: Array<{
   label: ReportType;
@@ -67,7 +68,7 @@ const REPORT_OPTIONS: Array<{
   {
     label: 'Promotion Report',
     icon: TrendingUp,
-    desc: 'Records of personnel advancements & career pipeline',
+    desc: 'Personnel advancements & career progression',
   },
   {
     label: 'Timely Report',
@@ -77,14 +78,14 @@ const REPORT_OPTIONS: Array<{
 ];
 
 const NMC_CHART_COLORS = [
-  '#14532d', // Dark Emerald / Forest
-  '#eab308', // Warm Amber Gold
-  '#0284c7', // Sky Blue
-  '#8b5cf6', // Violet
-  '#ec4899', // Pink
-  '#10b981', // Mint Emerald
-  '#f97316', // Orange
+  '#14532d', // Forest Green
+  '#059669', // Emerald
+  '#d97706', // Warm Amber
   '#0d9488', // Teal
+  '#0284c7', // Sky Blue
+  '#15803d', // Leaf Green
+  '#b45309', // Deep Amber
+  '#0f766e', // Deep Teal
 ];
 
 export const Reports: React.FC<ReportsProps> = ({ initialType }) => {
@@ -97,7 +98,16 @@ export const Reports: React.FC<ReportsProps> = ({ initialType }) => {
   const [datePreset, setDatePreset] = useState<DatePreset>('all');
   const [customStartDate, setCustomStartDate] = useState<string>('');
   const [customEndDate, setCustomEndDate] = useState<string>('');
+  const [searchInput, setSearchInput] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState<string>('');
+
+  // Debounce search query to prevent Recharts & query thrashing
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setSearchQuery(searchInput);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
 
   // Compute active date filters
   const dateFilterRange = useMemo(() => {
@@ -167,7 +177,8 @@ export const Reports: React.FC<ReportsProps> = ({ initialType }) => {
 
   const isLoading = activeQuery.isLoading || filtersQuery.isLoading;
   const isError = activeQuery.isError;
-  const errorMessage = activeQuery.error?.message || 'Failed to load report analytics.';
+  const errorMessage =
+    activeQuery.error?.message || 'Failed to load report analytics.';
 
   const departments = filtersQuery.data?.departments || [];
 
@@ -175,6 +186,24 @@ export const Reports: React.FC<ReportsProps> = ({ initialType }) => {
   const employmentData = employmentQuery.data;
   const promotionData = promotionQuery.data;
   const attendanceData = attendanceQuery.data;
+
+  // Formatted timestamp aligned with Dashboard
+  const generatedAt = useMemo(() => {
+    const now = new Date();
+    const datePart = now.toLocaleDateString('en-PH', {
+      timeZone: 'Asia/Manila',
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    });
+    const timePart = now.toLocaleTimeString('en-PH', {
+      timeZone: 'Asia/Manila',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    });
+    return `${datePart} at ${timePart}`;
+  }, []);
 
   // CSV Export Handlers
   const handleExportCsv = () => {
@@ -223,8 +252,14 @@ export const Reports: React.FC<ReportsProps> = ({ initialType }) => {
           { header: 'Absent Logs', accessor: 'absent' },
           { header: 'On Leave', accessor: 'onLeave' },
           { header: 'Total Logs', accessor: 'totalLogs' },
-          { header: 'Punctuality Rate %', accessor: (r) => `${r.punctualityRate}%` },
-          { header: 'Attendance Rate %', accessor: (r) => `${r.attendanceRate}%` },
+          {
+            header: 'Punctuality Rate %',
+            accessor: (r) => `${r.punctualityRate}%`,
+          },
+          {
+            header: 'Attendance Rate %',
+            accessor: (r) => `${r.attendanceRate}%`,
+          },
           { header: 'Performance Rating', accessor: 'performanceRating' },
         ],
         attendanceData.records
@@ -232,464 +267,499 @@ export const Reports: React.FC<ReportsProps> = ({ initialType }) => {
     }
   };
 
-  const handleExportJson = () => {
-    const data =
-      reportType === 'Employment Report'
-        ? employmentData
-        : reportType === 'Promotion Report'
-          ? promotionData
-          : attendanceData;
-    if (data) {
-      exportToJson(reportType, data);
-    }
-  };
-
   const currentRecordCount =
     reportType === 'Employment Report'
-      ? employmentData?.records.length ?? 0
+      ? (employmentData?.records.length ?? 0)
       : reportType === 'Promotion Report'
-        ? promotionData?.records.length ?? 0
-        : attendanceData?.records.length ?? 0;
+        ? (promotionData?.records.length ?? 0)
+        : (attendanceData?.records.length ?? 0);
+
+  // Common Recharts Tooltip styling aligned with Dashboard theme
+  const chartTooltipStyle = {
+    backgroundColor: '#052e16',
+    borderRadius: '12px',
+    border: '1px solid rgba(255,255,255,0.1)',
+    color: '#ffffff',
+    fontSize: '12px',
+    fontWeight: '600',
+    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+  };
 
   return (
-    <div id="reporting_module_container" className="space-y-8 max-w-7xl mx-auto pb-12 print:p-0 print:space-y-4">
-      {/* Printable Institutional Header (Visible ONLY on print) */}
-      <div className="hidden print:block border-b-2 border-green-900 pb-4 mb-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Logo className="w-14 h-14" />
-            <div>
-              <h1 className="text-xl font-black text-green-950 uppercase tracking-tight">
-                Northern Mindanao Colleges, Inc.
-              </h1>
-              <p className="text-xs font-bold text-gray-600 uppercase tracking-wider">
-                Human Resource Management & Development Office
-              </p>
-              <p className="text-[10px] text-gray-500 font-medium">
-                Official Analytical Dossier • Generated on {new Date().toLocaleString()}
-              </p>
-            </div>
-          </div>
-          <div className="text-right">
-            <span className="px-3 py-1 bg-green-900 text-yellow-400 font-black text-xs uppercase rounded-md tracking-wider">
-              {reportType}
-            </span>
-            <p className="text-[9px] text-gray-500 mt-1 uppercase">
-              Filter: {selectedDepartment ? departments.find(d => d.id === selectedDepartment)?.name : 'All Departments'}
-            </p>
-          </div>
-        </div>
-      </div>
-
+    <div
+      id="reporting_module_container"
+      className="space-y-8 animate-in fade-in duration-300 pb-16 print:p-0 print:space-y-4"
+    >
       {/* Screen Header */}
-      <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 print:hidden">
-        <div className="flex items-center gap-4">
-          <Logo className="w-12 h-12" />
+      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 print:hidden">
+        <div className="flex items-center gap-4 sm:gap-5">
+          <Logo className="w-14 h-14 sm:w-16 sm:h-16 md:w-20 md:h-20 shrink-0" />
           <div>
-            <h1 className="text-3xl font-black text-green-950 uppercase tracking-tighter">
-              Reporting & Analytics
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-green-950 tracking-tight">
+              Institutional Reports & Analytics
             </h1>
-            <div className="flex items-center gap-2 mt-1">
-              <span className="text-green-700 font-bold uppercase text-[11px] tracking-[0.2em]">
-                Live institutional intelligence and compliance auditing
+            <div className="flex flex-wrap items-center gap-2 mt-1.5">
+              <span className="text-xs font-semibold text-emerald-800">
+                Human Resources Information System
               </span>
-              <span className="h-1.5 w-1.5 rounded-full bg-yellow-400"></span>
-              <div className="flex items-center gap-1.5 px-2 py-0.5 bg-green-900 rounded-full shadow-sm">
-                <BarChart3 size={12} className="text-yellow-400" />
-                <span className="text-[10px] font-black text-white uppercase tracking-tighter">
-                  NMC INTEL
+              <span className="h-1.5 w-1.5 rounded-full bg-amber-400 hidden sm:inline-block" />
+              <div className="flex items-center gap-1.5 px-2.5 py-0.5 bg-green-900 text-white rounded-full shadow-xs">
+                <BarChart3 size={12} className="text-amber-300" />
+                <span className="text-[11px] font-bold tracking-wide">
+                  HR Office
                 </span>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Action Buttons Top Bar */}
-        <div className="flex items-center gap-2 self-start sm:self-auto">
+        {/* Action Controls & Generation Stamp */}
+        <div className="flex flex-wrap items-center gap-2 self-start md:self-auto">
           <button
             id="btn_download_csv"
             onClick={handleExportCsv}
             disabled={isLoading || currentRecordCount === 0}
-            className="flex items-center gap-2 px-4 py-2.5 bg-green-900 text-yellow-400 font-black rounded-xl text-xs uppercase tracking-wider hover:bg-green-950 transition-all shadow-md active:scale-95 disabled:opacity-50 cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-green-900 text-amber-300 font-semibold rounded-xl text-xs hover:bg-green-800 transition-colors shadow-xs active:scale-95 disabled:opacity-50 cursor-pointer focus-visible:ring-2 focus-visible:ring-green-800 focus-visible:outline-hidden"
             title="Download CSV formatted for Microsoft Excel"
           >
-            <FileSpreadsheet size={16} />
-            Export CSV
-          </button>
-          <button
-            id="btn_download_json"
-            onClick={handleExportJson}
-            disabled={isLoading || currentRecordCount === 0}
-            className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 text-green-950 font-black rounded-xl text-xs uppercase tracking-wider hover:bg-green-50 transition-all shadow-sm active:scale-95 disabled:opacity-50 cursor-pointer"
-            title="Download raw structured JSON dataset"
-          >
-            <Download size={14} />
-            JSON
-          </button>
-          <button
-            id="btn_print_report"
-            onClick={() => window.print()}
-            className="flex items-center gap-2 p-2.5 bg-yellow-400 text-green-950 hover:bg-yellow-300 rounded-xl transition-all shadow-md active:scale-95 cursor-pointer"
-            title="Print Official Report Document"
-          >
-            <Printer size={18} />
+            <FileSpreadsheet size={15} />
+            <span>Export CSV</span>
           </button>
         </div>
       </header>
 
-      {/* Report Library Selector */}
-      <div className="print:hidden space-y-4">
-        <h2 className="text-xs font-black text-green-900 uppercase tracking-widest ml-1">
-          Report Library
-        </h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          {REPORT_OPTIONS.map((opt) => {
-            const isSelected = reportType === opt.label;
-            const Icon = opt.icon;
-            return (
-              <button
-                id={`report_opt_${opt.label.toLowerCase().replace(/ /g, '_')}`}
-                key={opt.label}
-                onClick={() => setReportType(opt.label)}
-                className={`text-left p-4 rounded-3xl transition-all border cursor-pointer ${
-                  isSelected
-                    ? 'bg-green-900 border-green-900 text-yellow-400 shadow-xl'
-                    : 'bg-white border-gray-100 text-green-950 hover:bg-green-50/70 shadow-sm'
-                }`}
-              >
-                <div className="flex items-center gap-3 mb-1">
-                  <Icon
-                    size={20}
-                    className={isSelected ? 'text-yellow-400' : 'text-green-700'}
-                  />
-                  <span className="font-black text-sm">{opt.label}</span>
-                </div>
-                <p
-                  className={`text-[11px] font-medium ${
-                    isSelected ? 'text-green-200' : 'text-gray-400'
+      {/* Section Header & Report Selector */}
+      <section
+        aria-label="Report library and filters"
+        className="space-y-4 print:hidden"
+      >
+        <div className="flex flex-col xl:flex-row xl:items-center justify-between border-b border-stone-200/80 pb-4 gap-4">
+          <div>
+            <h2 className="text-xl sm:text-2xl font-bold text-green-950 tracking-tight flex items-center gap-2">
+              <FileText size={22} className="text-amber-500" />
+              Institutional Dossier
+            </h2>
+            <p className="text-xs sm:text-sm text-stone-600 mt-1 max-w-2xl">
+              Comprehensive analytical records across employment movements,
+              career promotion pipelines, and daily timeliness records.
+            </p>
+          </div>
+
+          {/* Report Tab Switcher aligned with Dashboard tablist */}
+          <div
+            role="tablist"
+            aria-label="Filter report dossier view"
+            className="flex items-center gap-1 bg-stone-100 border border-stone-200/80 rounded-2xl p-1 overflow-x-auto max-w-full shrink-0 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          >
+            {REPORT_OPTIONS.map((opt) => {
+              const isSelected = reportType === opt.label;
+              const Icon = opt.icon;
+              return (
+                <button
+                  key={opt.label}
+                  role="tab"
+                  aria-selected={isSelected}
+                  onClick={() => setReportType(opt.label)}
+                  className={`flex items-center gap-1.5 px-3.5 py-1.5 min-h-[36px] rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer focus-visible:ring-2 focus-visible:ring-green-800 focus-visible:outline-hidden ${
+                    isSelected
+                      ? 'bg-green-900 text-amber-300 shadow-xs'
+                      : 'text-stone-600 hover:text-green-950 hover:bg-stone-200/60'
                   }`}
                 >
-                  {opt.desc}
-                </p>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Filtering & Drill-down Toolbar */}
-      <div className="print:hidden bg-white p-5 rounded-[32px] border border-gray-100 shadow-xl flex flex-col md:flex-row gap-4 items-stretch md:items-center">
-        {/* Department Selector */}
-        <div className="flex items-center gap-2.5 min-w-[220px]">
-          <Filter size={16} className="text-green-800 shrink-0" />
-          <div className="relative flex-1">
-            <select
-              id="filter_department_select"
-              value={selectedDepartment}
-              onChange={(e) => setSelectedDepartment(e.target.value)}
-              className="w-full bg-gray-50 border-none rounded-2xl py-3 px-4 pr-9 font-bold text-xs text-green-950 outline-none focus:ring-2 focus:ring-yellow-400 appearance-none cursor-pointer"
-            >
-              <option value="">All Departments</option>
-              {departments.map((dept) => (
-                <option key={dept.id} value={dept.id}>
-                  {dept.name}
-                </option>
-              ))}
-            </select>
-            <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                  <Icon
+                    size={14}
+                    className={isSelected ? 'text-amber-300' : 'text-stone-500'}
+                  />
+                  <span>{opt.label}</span>
+                </button>
+              );
+            })}
           </div>
         </div>
 
-        {/* Date Preset Selector */}
-        <div className="flex items-center gap-2.5 min-w-[200px]">
-          <Calendar size={16} className="text-green-800 shrink-0" />
-          <div className="relative flex-1">
-            <select
-              id="filter_date_preset_select"
-              value={datePreset}
-              onChange={(e) => setDatePreset(e.target.value as DatePreset)}
-              className="w-full bg-gray-50 border-none rounded-2xl py-3 px-4 pr-9 font-bold text-xs text-green-950 outline-none focus:ring-2 focus:ring-yellow-400 appearance-none cursor-pointer"
-            >
-              <option value="all">All Time History</option>
-              <option value="this_month">This Month</option>
-              <option value="this_quarter">This Quarter</option>
-              <option value="this_year">This Year (2026)</option>
-              <option value="custom">Custom Date Range...</option>
-            </select>
-            <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+        {/* Filtering & Drill-down Toolbar */}
+        <div className="bg-white p-4 rounded-2xl border border-stone-200/80 shadow-xs flex flex-col md:flex-row gap-3 items-stretch md:items-center">
+          {/* Department Selector */}
+          <div className="flex items-center gap-2 flex-1 sm:flex-initial sm:min-w-[200px]">
+            <Filter size={16} className="text-stone-400 shrink-0" />
+            <div className="relative flex-1">
+              <label htmlFor="filter_department_select" className="sr-only">
+                Filter by Department
+              </label>
+              <select
+                id="filter_department_select"
+                aria-label="Filter by department"
+                value={selectedDepartment}
+                onChange={(e) => setSelectedDepartment(e.target.value)}
+                className="w-full bg-stone-50 border border-stone-200/80 rounded-xl py-2 px-3 pr-8 font-semibold text-xs text-green-950 outline-hidden focus-visible:ring-2 focus-visible:ring-green-800 appearance-none cursor-pointer"
+              >
+                <option value="">All Departments</option>
+                {departments.map((dept) => (
+                  <option key={dept.id} value={dept.id}>
+                    {dept.name}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown
+                size={14}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-stone-400 pointer-events-none"
+              />
+            </div>
           </div>
-        </div>
 
-        {/* Custom Date Pickers */}
-        {datePreset === 'custom' && (
-          <div className="flex items-center gap-2 animate-in fade-in duration-200">
-            <input
-              type="date"
-              value={customStartDate}
-              onChange={(e) => setCustomStartDate(e.target.value)}
-              className="bg-gray-50 rounded-xl px-3 py-2 text-xs font-bold text-green-950 outline-none focus:ring-2 focus:ring-yellow-400"
+          {/* Date Preset Selector */}
+          <div className="flex items-center gap-2 flex-1 sm:flex-initial sm:min-w-[180px]">
+            <Calendar size={16} className="text-stone-400 shrink-0" />
+            <div className="relative flex-1">
+              <label htmlFor="filter_date_preset_select" className="sr-only">
+                Filter by Date Preset
+              </label>
+              <select
+                id="filter_date_preset_select"
+                aria-label="Filter by date preset"
+                value={datePreset}
+                onChange={(e) => setDatePreset(e.target.value as DatePreset)}
+                className="w-full bg-stone-50 border border-stone-200/80 rounded-xl py-2 px-3 pr-8 font-semibold text-xs text-green-950 outline-hidden focus-visible:ring-2 focus-visible:ring-green-800 appearance-none cursor-pointer"
+              >
+                <option value="all">All Time History</option>
+                <option value="this_month">This Month</option>
+                <option value="this_quarter">This Quarter</option>
+                <option value="this_year">This Year (2026)</option>
+                <option value="custom">Custom Date Range...</option>
+              </select>
+              <ChevronDown
+                size={14}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-stone-400 pointer-events-none"
+              />
+            </div>
+          </div>
+
+          {/* Custom Date Pickers */}
+          {datePreset === 'custom' && (
+            <div className="flex items-center gap-2 animate-in fade-in duration-200">
+              <label htmlFor="filter_custom_start_date" className="sr-only">
+                Custom start date
+              </label>
+              <input
+                id="filter_custom_start_date"
+                aria-label="Custom start date"
+                type="date"
+                value={customStartDate}
+                onChange={(e) => setCustomStartDate(e.target.value)}
+                className="bg-stone-50 border border-stone-200/80 rounded-xl px-2.5 py-1.5 text-xs font-semibold text-green-950 outline-hidden focus-visible:ring-2 focus-visible:ring-green-800"
+              />
+              <span className="text-xs text-stone-400 font-semibold">to</span>
+              <label htmlFor="filter_custom_end_date" className="sr-only">
+                Custom end date
+              </label>
+              <input
+                id="filter_custom_end_date"
+                aria-label="Custom end date"
+                type="date"
+                value={customEndDate}
+                onChange={(e) => setCustomEndDate(e.target.value)}
+                className="bg-stone-50 border border-stone-200/80 rounded-xl px-2.5 py-1.5 text-xs font-semibold text-green-950 outline-hidden focus-visible:ring-2 focus-visible:ring-green-800"
+              />
+            </div>
+          )}
+
+          {/* Debounced Search Input */}
+          <div className="flex-1 relative">
+            <Search
+              size={16}
+              className="absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-400"
             />
-            <span className="text-xs text-gray-400 font-bold">to</span>
+            <label htmlFor="filter_search_input" className="sr-only">
+              Search records
+            </label>
             <input
-              type="date"
-              value={customEndDate}
-              onChange={(e) => setCustomEndDate(e.target.value)}
-              className="bg-gray-50 rounded-xl px-3 py-2 text-xs font-bold text-green-950 outline-none focus:ring-2 focus:ring-yellow-400"
+              id="filter_search_input"
+              aria-label="Search employee name, ID, or position"
+              type="text"
+              placeholder="Search employee name, ID, or position..."
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              className="w-full pl-9 pr-3.5 py-2 bg-stone-50 border border-stone-200/80 rounded-xl text-xs font-semibold text-green-950 placeholder:text-stone-400 outline-hidden focus-visible:ring-2 focus-visible:ring-green-800"
             />
           </div>
-        )}
 
-        {/* Search Input */}
-        <div className="flex-1 relative">
-          <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input
-            id="filter_search_input"
-            type="text"
-            placeholder="Search employee name, ID, or position..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-11 pr-4 py-3 bg-gray-50 rounded-2xl text-xs font-bold text-green-950 outline-none focus:ring-2 focus:ring-yellow-400"
-          />
+          {/* Clear Filters Button */}
+          {(selectedDepartment || datePreset !== 'all' || searchInput) && (
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedDepartment('');
+                setDatePreset('all');
+                setCustomStartDate('');
+                setCustomEndDate('');
+                setSearchInput('');
+                setSearchQuery('');
+              }}
+              className="px-3 py-2 text-xs font-semibold text-emerald-800 hover:text-green-950 hover:bg-emerald-50 rounded-xl transition-colors cursor-pointer whitespace-nowrap focus-visible:ring-2 focus-visible:ring-green-800 focus-visible:outline-hidden"
+            >
+              Clear Filters
+            </button>
+          )}
         </div>
-
-        {/* Reset Filters Button */}
-        {(selectedDepartment || datePreset !== 'all' || searchQuery) && (
-          <button
-            onClick={() => {
-              setSelectedDepartment('');
-              setDatePreset('all');
-              setCustomStartDate('');
-              setCustomEndDate('');
-              setSearchQuery('');
-            }}
-            className="px-3 py-2 text-[10px] font-black uppercase tracking-wider text-green-800 hover:text-green-950 hover:bg-green-50 rounded-xl transition-all cursor-pointer whitespace-nowrap"
-          >
-            Clear Filters
-          </button>
-        )}
-      </div>
+      </section>
 
       {/* Error Banner */}
       {isError && (
         <div className="flex items-center justify-between p-4 bg-rose-50 border border-rose-200 rounded-2xl text-rose-800">
           <div className="flex items-center gap-3">
-            <AlertCircle size={20} className="text-rose-600" />
-            <p className="text-xs font-bold">{errorMessage}</p>
+            <AlertCircle size={20} className="text-rose-600 shrink-0" />
+            <p className="text-xs font-semibold">{errorMessage}</p>
           </div>
           <button
+            type="button"
             onClick={() => void activeQuery.refetch()}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-600 text-white font-black text-xs rounded-xl hover:bg-rose-700 transition-all cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-rose-600 text-white font-semibold text-xs rounded-xl hover:bg-rose-700 transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-rose-800 focus-visible:outline-hidden"
           >
             <RefreshCw size={12} />
-            Retry
+            <span>Retry</span>
           </button>
         </div>
       )}
 
-      {/* Dynamic KPI Summary Cards */}
-      {reportType === 'Timely Report' && attendanceData && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-5">
-          <div id="stat_punctuality" className="p-5 bg-emerald-50 rounded-3xl border border-emerald-100 flex flex-col justify-between shadow-xs">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-[10px] font-black uppercase tracking-widest text-emerald-900">Average Punctuality</span>
-              <div className="p-2 bg-emerald-100 text-emerald-800 rounded-xl">
-                <Clock size={18} />
-              </div>
-            </div>
-            <div>
-              <p className="text-3xl font-black text-emerald-950">{attendanceData.metrics.avgPunctuality}%</p>
-              <p className="text-[10px] font-bold text-emerald-700 uppercase mt-1">on-time arrival rate</p>
-            </div>
-          </div>
+      {/* KPI Overview Cards aligned with Dashboard layout */}
+      <section
+        aria-label="Key report metrics"
+        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 print:grid-cols-4"
+      >
+        {reportType === 'Timely Report' && attendanceData && (
+          <>
+            {[
+              {
+                label: 'Average Punctuality',
+                subtitle: 'On-time arrival rate',
+                value: `${attendanceData.metrics.avgPunctuality}%`,
+                icon: Clock,
+                iconBg: 'bg-emerald-50 text-emerald-800',
+              },
+              {
+                label: 'Overall Attendance',
+                subtitle: 'Presence compliance rate',
+                value: `${attendanceData.metrics.attendanceRate}%`,
+                icon: CheckCircle2,
+                iconBg: 'bg-green-50 text-green-800',
+              },
+              {
+                label: 'Audited Logs',
+                subtitle: 'Active records in query',
+                value: attendanceData.metrics.totalChecked,
+                icon: FileText,
+                iconBg: 'bg-stone-100 text-stone-800',
+              },
+              {
+                label: 'Total Tardiness',
+                subtitle: 'Recorded late check-ins',
+                value: attendanceData.metrics.lates,
+                icon: Clock,
+                iconBg: 'bg-amber-50 text-amber-900',
+              },
+            ].map((stat, i) => (
+              <motion.div
+                key={i}
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3, delay: i * 0.05 }}
+                className="p-5 bg-white rounded-2xl border border-stone-200/80 shadow-xs flex flex-col items-center justify-center text-center group transition-all"
+              >
+                <div
+                  className={`p-3 rounded-xl ${stat.iconBg} mb-3 group-hover:scale-105 transition-transform`}
+                >
+                  <stat.icon size={22} />
+                </div>
+                <h3 className="text-3xl font-extrabold text-green-950 tracking-tight tabular-nums leading-none">
+                  {stat.value}
+                </h3>
+                <p className="text-sm font-bold text-stone-800 mt-2">
+                  {stat.label}
+                </p>
+                <p className="text-xs text-stone-500 mt-0.5">{stat.subtitle}</p>
+              </motion.div>
+            ))}
+          </>
+        )}
 
-          <div id="stat_attendance_rate" className="p-5 bg-blue-50 rounded-3xl border border-blue-100 flex flex-col justify-between shadow-xs">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-[10px] font-black uppercase tracking-widest text-blue-900">Overall Attendance</span>
-              <div className="p-2 bg-blue-100 text-blue-800 rounded-xl">
-                <CheckCircle2 size={18} />
-              </div>
-            </div>
-            <div>
-              <p className="text-3xl font-black text-blue-950">{attendanceData.metrics.attendanceRate}%</p>
-              <p className="text-[10px] font-bold text-blue-700 uppercase mt-1">presence compliance</p>
-            </div>
-          </div>
+        {reportType === 'Promotion Report' && promotionData && (
+          <>
+            {[
+              {
+                label: 'Promotions This Year',
+                subtitle: 'Effective in 2026',
+                value: promotionData.metrics.thisYearCount,
+                icon: TrendingUp,
+                iconBg: 'bg-amber-50 text-amber-900',
+              },
+              {
+                label: 'Next Year Pipeline',
+                subtitle: 'Scheduled for 2027',
+                value: promotionData.metrics.nextYearCount,
+                icon: ArrowUpRight,
+                iconBg: 'bg-teal-50 text-teal-800',
+              },
+              {
+                label: 'Approved Promotions',
+                subtitle: 'Sanctioned advancements',
+                value: promotionData.metrics.approvedCount,
+                icon: Award,
+                iconBg: 'bg-emerald-50 text-emerald-800',
+              },
+              {
+                label: 'Total Candidates',
+                subtitle: 'Career progressions tracked',
+                value: promotionData.metrics.totalEvaluated,
+                icon: Users,
+                iconBg: 'bg-green-50 text-green-800',
+              },
+            ].map((stat, i) => (
+              <motion.div
+                key={i}
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3, delay: i * 0.05 }}
+                className="p-5 bg-white rounded-2xl border border-stone-200/80 shadow-xs flex flex-col items-center justify-center text-center group transition-all"
+              >
+                <div
+                  className={`p-3 rounded-xl ${stat.iconBg} mb-3 group-hover:scale-105 transition-transform`}
+                >
+                  <stat.icon size={22} />
+                </div>
+                <h3 className="text-3xl font-extrabold text-green-950 tracking-tight tabular-nums leading-none">
+                  {stat.value}
+                </h3>
+                <p className="text-sm font-bold text-stone-800 mt-2">
+                  {stat.label}
+                </p>
+                <p className="text-xs text-stone-500 mt-0.5">{stat.subtitle}</p>
+              </motion.div>
+            ))}
+          </>
+        )}
 
-          <div id="stat_audited_logs" className="p-5 bg-green-900 rounded-3xl border border-green-950 flex flex-col justify-between shadow-xs text-white">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-[10px] font-black uppercase tracking-widest text-yellow-400 font-mono">Audited Logs</span>
-              <div className="p-2 bg-green-800 text-yellow-400 rounded-xl">
-                <FileText size={18} />
-              </div>
-            </div>
-            <div>
-              <p className="text-3xl font-black text-white">{attendanceData.metrics.totalChecked}</p>
-              <p className="text-[10px] font-bold text-green-300 uppercase mt-1">active records in query</p>
-            </div>
-          </div>
-
-          <div id="stat_tardiness_count" className="p-5 bg-amber-50 rounded-3xl border border-amber-100 flex flex-col justify-between shadow-xs">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-[10px] font-black uppercase tracking-widest text-amber-900">Total Tardiness</span>
-              <div className="p-2 bg-amber-100 text-amber-800 rounded-xl">
-                <Clock size={18} />
-              </div>
-            </div>
-            <div>
-              <p className="text-3xl font-black text-amber-950">{attendanceData.metrics.lates}</p>
-              <p className="text-[10px] font-bold text-amber-700 uppercase mt-1">recorded late check-ins</p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {reportType === 'Promotion Report' && promotionData && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-5">
-          <div id="stat_promotions_2026" className="p-5 bg-amber-50 rounded-3xl border border-amber-100 flex flex-col justify-between shadow-xs">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-[10px] font-black uppercase tracking-widest text-amber-900">Promotions This Year</span>
-              <div className="p-2 bg-amber-100 text-amber-800 rounded-xl">
-                <TrendingUp size={18} />
-              </div>
-            </div>
-            <div>
-              <p className="text-3xl font-black text-amber-950">{promotionData.metrics.thisYearCount}</p>
-              <p className="text-[10px] font-bold text-amber-700 uppercase mt-1">effective in 2026</p>
-            </div>
-          </div>
-
-          <div id="stat_promotions_2027" className="p-5 bg-indigo-50 rounded-3xl border border-indigo-100 flex flex-col justify-between shadow-xs">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-[10px] font-black uppercase tracking-widest text-indigo-900">Next Year Pipeline</span>
-              <div className="p-2 bg-indigo-100 text-indigo-800 rounded-xl">
-                <ArrowUpRight size={18} />
-              </div>
-            </div>
-            <div>
-              <p className="text-3xl font-black text-indigo-950">{promotionData.metrics.nextYearCount}</p>
-              <p className="text-[10px] font-bold text-indigo-700 uppercase mt-1">scheduled for 2027</p>
-            </div>
-          </div>
-
-          <div id="stat_approved_promotions" className="p-5 bg-emerald-50 rounded-3xl border border-emerald-100 flex flex-col justify-between shadow-xs">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-[10px] font-black uppercase tracking-widest text-emerald-900">Approved Promotions</span>
-              <div className="p-2 bg-emerald-100 text-emerald-800 rounded-xl">
-                <Award size={18} />
-              </div>
-            </div>
-            <div>
-              <p className="text-3xl font-black text-emerald-950">{promotionData.metrics.approvedCount}</p>
-              <p className="text-[10px] font-bold text-emerald-700 uppercase mt-1">board & admin sanctioned</p>
-            </div>
-          </div>
-
-          <div id="stat_pipeline_total" className="p-5 bg-green-900 rounded-3xl border border-green-950 flex flex-col justify-between shadow-xs text-white">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-[10px] font-black uppercase tracking-widest text-yellow-400 font-mono">Total Candidates</span>
-              <div className="p-2 bg-green-800 text-yellow-400 rounded-xl">
-                <Users size={18} />
-              </div>
-            </div>
-            <div>
-              <p className="text-3xl font-black text-white">{promotionData.metrics.totalEvaluated}</p>
-              <p className="text-[10px] font-bold text-green-300 uppercase mt-1">career progressions tracked</p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {reportType === 'Employment Report' && employmentData && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-5">
-          <div id="stat_total_headcount" className="p-5 bg-green-50 rounded-3xl border border-green-100 flex flex-col justify-between shadow-xs">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-[10px] font-black uppercase tracking-widest text-green-900">Total Headcount</span>
-              <div className="p-2 bg-green-100 text-green-800 rounded-xl">
-                <Users size={18} />
-              </div>
-            </div>
-            <div>
-              <p className="text-3xl font-black text-green-950">{employmentData.metrics.totalEmployees}</p>
-              <p className="text-[10px] font-bold text-green-700 uppercase mt-1">institutional staff roster</p>
-            </div>
-          </div>
-
-          <div id="stat_retention_rate" className="p-5 bg-yellow-50 rounded-3xl border border-yellow-100 flex flex-col justify-between shadow-xs">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-[10px] font-black uppercase tracking-widest text-yellow-900">Active Retention Rate</span>
-              <div className="p-2 bg-yellow-100 text-yellow-800 rounded-xl">
-                <TrendingUp size={18} />
-              </div>
-            </div>
-            <div>
-              <p className="text-3xl font-black text-yellow-950">{employmentData.metrics.retentionRate}%</p>
-              <p className="text-[10px] font-bold text-yellow-700 uppercase mt-1">{employmentData.metrics.activeEmployees} active personnel</p>
-            </div>
-          </div>
-
-          <div id="stat_recent_hires" className="p-5 bg-blue-50 rounded-3xl border border-blue-100 flex flex-col justify-between shadow-xs">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-[10px] font-black uppercase tracking-widest text-blue-900">Annual Growth / Hires</span>
-              <div className="p-2 bg-blue-100 text-blue-800 rounded-xl">
-                <ArrowUpRight size={18} />
-              </div>
-            </div>
-            <div>
-              <p className="text-3xl font-black text-blue-950">+{employmentData.metrics.recentHires}</p>
-              <p className="text-[10px] font-bold text-blue-700 uppercase mt-1">{employmentData.metrics.growthRate}% annual expansion rate</p>
-            </div>
-          </div>
-
-          <div id="stat_inactive_staff" className="p-5 bg-gray-50 rounded-3xl border border-gray-200 flex flex-col justify-between shadow-xs">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-[10px] font-black uppercase tracking-widest text-gray-700">Inactive & Retired</span>
-              <div className="p-2 bg-gray-200 text-gray-700 rounded-xl">
-                <Clock size={18} />
-              </div>
-            </div>
-            <div>
-              <p className="text-3xl font-black text-gray-900">
-                {employmentData.metrics.inactiveEmployees + employmentData.metrics.retiredEmployees}
-              </p>
-              <p className="text-[10px] font-bold text-gray-500 uppercase mt-1">transitioned personnel</p>
-            </div>
-          </div>
-        </div>
-      )}
+        {reportType === 'Employment Report' && employmentData && (
+          <>
+            {[
+              {
+                label: 'Total Headcount',
+                subtitle: 'Active institutional roster',
+                value: employmentData.metrics.totalEmployees,
+                icon: Users,
+                iconBg: 'bg-emerald-50 text-emerald-800',
+              },
+              {
+                label: 'Active Retention Rate',
+                subtitle: `${employmentData.metrics.activeEmployees} active personnel`,
+                value: `${employmentData.metrics.retentionRate}%`,
+                icon: TrendingUp,
+                iconBg: 'bg-green-50 text-green-800',
+              },
+              {
+                label: 'Annual Growth',
+                subtitle: `${employmentData.metrics.growthRate}% annual expansion`,
+                value: `+${employmentData.metrics.recentHires}`,
+                icon: ArrowUpRight,
+                iconBg: 'bg-amber-50 text-amber-900',
+              },
+              {
+                label: 'Inactive & Retired',
+                subtitle: 'Transitioned personnel',
+                value:
+                  employmentData.metrics.inactiveEmployees +
+                  employmentData.metrics.retiredEmployees,
+                icon: Clock,
+                iconBg: 'bg-stone-100 text-stone-700',
+              },
+            ].map((stat, i) => (
+              <motion.div
+                key={i}
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3, delay: i * 0.05 }}
+                className="p-5 bg-white rounded-2xl border border-stone-200/80 shadow-xs flex flex-col items-center justify-center text-center group transition-all"
+              >
+                <div
+                  className={`p-3 rounded-xl ${stat.iconBg} mb-3 group-hover:scale-105 transition-transform`}
+                >
+                  <stat.icon size={22} />
+                </div>
+                <h3 className="text-3xl font-extrabold text-green-950 tracking-tight tabular-nums leading-none">
+                  {stat.value}
+                </h3>
+                <p className="text-sm font-bold text-stone-800 mt-2">
+                  {stat.label}
+                </p>
+                <p className="text-xs text-stone-500 mt-0.5">{stat.subtitle}</p>
+              </motion.div>
+            ))}
+          </>
+        )}
+      </section>
 
       {/* Interactive Recharts Analytics Section */}
-      <div className="print:hidden space-y-6">
+      <section
+        aria-label="Detailed report visualizations"
+        className="space-y-6 print:hidden"
+      >
         {reportType === 'Employment Report' && employmentData && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Department Headcount Distribution */}
-            <div className="bg-white p-6 rounded-[32px] border border-gray-100 shadow-xl space-y-4">
+            <div className="bg-white p-6 rounded-2xl border border-stone-200/80 shadow-xs space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-sm font-black text-green-950 uppercase tracking-tight">
+                  <h3 className="text-base font-bold text-green-950">
                     Headcount by Department
                   </h3>
-                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                  <p className="text-xs text-stone-500 font-medium mt-0.5">
                     Staff concentration across academic and administrative units
                   </p>
                 </div>
-                <span className="px-2.5 py-1 bg-green-50 text-green-900 font-black text-[10px] rounded-full uppercase">
-                  {employmentData.charts.departmentDistribution.length} Departments
+                <span className="text-emerald-800 font-bold bg-emerald-50 px-2.5 py-1 rounded-lg text-xs tabular-nums">
+                  {employmentData.charts.departmentDistribution.length}{' '}
+                  Departments
                 </span>
               </div>
               <div className="h-64 w-full">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={employmentData.charts.departmentDistribution} margin={{ top: 10, right: 10, left: -20, bottom: 20 }}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
-                    <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#4b5563', fontWeight: 600 }} angle={-25} textAnchor="end" interval={0} />
-                    <YAxis tick={{ fontSize: 10, fill: '#6b7280' }} allowDecimals={false} />
-                    <Tooltip
-                      contentStyle={{ backgroundColor: '#14532d', borderRadius: '12px', border: 'none', color: '#fff', fontSize: '11px', fontWeight: 'bold' }}
-                      itemStyle={{ color: '#facc15' }}
+                  <BarChart
+                    data={employmentData.charts.departmentDistribution}
+                    margin={{ top: 10, right: 10, left: -20, bottom: 20 }}
+                  >
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      vertical={false}
+                      stroke="#f5f5f4"
                     />
-                    <Bar dataKey="count" name="Staff Count" fill="#14532d" radius={[8, 8, 0, 0]}>
-                      {employmentData.charts.departmentDistribution.map((_, i) => (
-                        <Cell key={`cell-${i}`} fill={NMC_CHART_COLORS[i % NMC_CHART_COLORS.length]} />
-                      ))}
+                    <XAxis
+                      dataKey="name"
+                      tick={{ fontSize: 11, fill: '#78716c', fontWeight: 600 }}
+                      angle={-25}
+                      textAnchor="end"
+                      interval={0}
+                    />
+                    <YAxis
+                      tick={{ fontSize: 11, fill: '#78716c' }}
+                      allowDecimals={false}
+                    />
+                    <Tooltip
+                      contentStyle={chartTooltipStyle}
+                      itemStyle={{ color: '#fcd34d' }}
+                    />
+                    <Bar
+                      dataKey="count"
+                      name="Staff Count"
+                      fill="#14532d"
+                      radius={[6, 6, 0, 0]}
+                    >
+                      {employmentData.charts.departmentDistribution.map(
+                        (_, i) => (
+                          <Cell
+                            key={`cell-${i}`}
+                            fill={NMC_CHART_COLORS[i % NMC_CHART_COLORS.length]}
+                          />
+                        )
+                      )}
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
@@ -697,31 +767,49 @@ export const Reports: React.FC<ReportsProps> = ({ initialType }) => {
             </div>
 
             {/* Tenure Profile */}
-            <div className="bg-white p-6 rounded-[32px] border border-gray-100 shadow-xl space-y-4">
+            <div className="bg-white p-6 rounded-2xl border border-stone-200/80 shadow-xs space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-sm font-black text-green-950 uppercase tracking-tight">
+                  <h3 className="text-base font-bold text-green-950">
                     Service Duration Profile
                   </h3>
-                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                  <p className="text-xs text-stone-500 font-medium mt-0.5">
                     Distribution of staff tenure and institutional experience
                   </p>
                 </div>
-                <span className="px-2.5 py-1 bg-yellow-105 text-yellow-900 font-black text-[10px] rounded-full uppercase">
+                <span className="text-amber-900 font-bold bg-amber-100/80 px-2.5 py-1 rounded-lg text-xs">
                   Tenure Bands
                 </span>
               </div>
               <div className="h-64 w-full">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={employmentData.charts.tenureDistribution} margin={{ top: 10, right: 10, left: -20, bottom: 10 }}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
-                    <XAxis dataKey="range" tick={{ fontSize: 10, fill: '#4b5563', fontWeight: 600 }} />
-                    <YAxis tick={{ fontSize: 10, fill: '#6b7280' }} allowDecimals={false} />
-                    <Tooltip
-                      contentStyle={{ backgroundColor: '#14532d', borderRadius: '12px', border: 'none', color: '#fff', fontSize: '11px', fontWeight: 'bold' }}
-                      itemStyle={{ color: '#facc15' }}
+                  <BarChart
+                    data={employmentData.charts.tenureDistribution}
+                    margin={{ top: 10, right: 10, left: -20, bottom: 10 }}
+                  >
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      vertical={false}
+                      stroke="#f5f5f4"
                     />
-                    <Bar dataKey="count" name="Employees" fill="#eab308" radius={[8, 8, 0, 0]} />
+                    <XAxis
+                      dataKey="range"
+                      tick={{ fontSize: 11, fill: '#78716c', fontWeight: 600 }}
+                    />
+                    <YAxis
+                      tick={{ fontSize: 11, fill: '#78716c' }}
+                      allowDecimals={false}
+                    />
+                    <Tooltip
+                      contentStyle={chartTooltipStyle}
+                      itemStyle={{ color: '#fcd34d' }}
+                    />
+                    <Bar
+                      dataKey="count"
+                      name="Employees"
+                      fill="#d97706"
+                      radius={[6, 6, 0, 0]}
+                    />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -732,63 +820,108 @@ export const Reports: React.FC<ReportsProps> = ({ initialType }) => {
         {reportType === 'Promotion Report' && promotionData && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Promotion Pipeline by Year */}
-            <div className="bg-white p-6 rounded-[32px] border border-gray-100 shadow-xl space-y-4">
+            <div className="bg-white p-6 rounded-2xl border border-stone-200/80 shadow-xs space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-sm font-black text-green-950 uppercase tracking-tight">
+                  <h3 className="text-base font-bold text-green-950">
                     Advancement Pipeline by Year
                   </h3>
-                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                  <p className="text-xs text-stone-500 font-medium mt-0.5">
                     Scheduled and pending promotions across review cycles
                   </p>
                 </div>
-                <span className="px-2.5 py-1 bg-amber-50 text-amber-900 font-black text-[10px] rounded-full uppercase">
+                <span className="text-amber-900 font-bold bg-amber-100/80 px-2.5 py-1 rounded-lg text-xs">
                   Multi-Year Outlook
                 </span>
               </div>
               <div className="h-64 w-full">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={promotionData.charts.yearlyPipeline} margin={{ top: 10, right: 10, left: -20, bottom: 10 }}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
-                    <XAxis dataKey="year" tick={{ fontSize: 11, fill: '#14532d', fontWeight: 700 }} />
-                    <YAxis tick={{ fontSize: 10, fill: '#6b7280' }} allowDecimals={false} />
-                    <Tooltip
-                      contentStyle={{ backgroundColor: '#14532d', borderRadius: '12px', border: 'none', color: '#fff', fontSize: '11px', fontWeight: 'bold' }}
+                  <BarChart
+                    data={promotionData.charts.yearlyPipeline}
+                    margin={{ top: 10, right: 10, left: -20, bottom: 10 }}
+                  >
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      vertical={false}
+                      stroke="#f5f5f4"
                     />
-                    <Legend wrapperStyle={{ fontSize: '11px', fontWeight: 'bold' }} />
-                    <Bar dataKey="approved" name="Approved" fill="#10b981" radius={[6, 6, 0, 0]} />
-                    <Bar dataKey="pending" name="In Evaluation" fill="#f59e0b" radius={[6, 6, 0, 0]} />
+                    <XAxis
+                      dataKey="year"
+                      tick={{ fontSize: 11, fill: '#14532d', fontWeight: 700 }}
+                    />
+                    <YAxis
+                      tick={{ fontSize: 11, fill: '#78716c' }}
+                      allowDecimals={false}
+                    />
+                    <Tooltip contentStyle={chartTooltipStyle} />
+                    <Legend
+                      wrapperStyle={{ fontSize: '11px', fontWeight: 'bold' }}
+                    />
+                    <Bar
+                      dataKey="approved"
+                      name="Approved"
+                      fill="#10b981"
+                      radius={[6, 6, 0, 0]}
+                    />
+                    <Bar
+                      dataKey="pending"
+                      name="In Evaluation"
+                      fill="#f59e0b"
+                      radius={[6, 6, 0, 0]}
+                    />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
             </div>
 
             {/* Promotions by Department */}
-            <div className="bg-white p-6 rounded-[32px] border border-gray-100 shadow-xl space-y-4">
+            <div className="bg-white p-6 rounded-2xl border border-stone-200/80 shadow-xs space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-sm font-black text-green-950 uppercase tracking-tight">
+                  <h3 className="text-base font-bold text-green-950">
                     Promotions by Department
                   </h3>
-                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                  <p className="text-xs text-stone-500 font-medium mt-0.5">
                     Advancement volume categorized by faculty and office
                   </p>
                 </div>
-                <span className="px-2.5 py-1 bg-indigo-50 text-indigo-900 font-black text-[10px] rounded-full uppercase">
+                <span className="text-teal-900 font-bold bg-teal-50 px-2.5 py-1 rounded-lg text-xs">
                   Departmental Split
                 </span>
               </div>
               <div className="h-64 w-full">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={promotionData.charts.departmentBreakdown} layout="vertical" margin={{ top: 10, right: 20, left: 20, bottom: 10 }}>
-                    <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f3f4f6" />
-                    <XAxis type="number" tick={{ fontSize: 10, fill: '#6b7280' }} allowDecimals={false} />
-                    <YAxis dataKey="department" type="category" tick={{ fontSize: 10, fill: '#14532d', fontWeight: 700 }} width={120} />
-                    <Tooltip
-                      contentStyle={{ backgroundColor: '#14532d', borderRadius: '12px', border: 'none', color: '#fff', fontSize: '11px', fontWeight: 'bold' }}
-                      itemStyle={{ color: '#facc15' }}
+                  <BarChart
+                    data={promotionData.charts.departmentBreakdown}
+                    layout="vertical"
+                    margin={{ top: 10, right: 20, left: 20, bottom: 10 }}
+                  >
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      horizontal={false}
+                      stroke="#f5f5f4"
                     />
-                    <Bar dataKey="count" name="Candidates" fill="#6366f1" radius={[0, 8, 8, 0]} />
+                    <XAxis
+                      type="number"
+                      tick={{ fontSize: 11, fill: '#78716c' }}
+                      allowDecimals={false}
+                    />
+                    <YAxis
+                      dataKey="department"
+                      type="category"
+                      tick={{ fontSize: 11, fill: '#14532d', fontWeight: 700 }}
+                      width={120}
+                    />
+                    <Tooltip
+                      contentStyle={chartTooltipStyle}
+                      itemStyle={{ color: '#fcd34d' }}
+                    />
+                    <Bar
+                      dataKey="count"
+                      name="Candidates"
+                      fill="#0d9488"
+                      radius={[0, 6, 6, 0]}
+                    />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -798,50 +931,87 @@ export const Reports: React.FC<ReportsProps> = ({ initialType }) => {
 
         {reportType === 'Timely Report' && attendanceData && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Punctuality Trend Line/Area Chart (col-span-2) */}
-            <div className="lg:col-span-2 bg-white p-6 rounded-[32px] border border-gray-100 shadow-xl space-y-4">
+            {/* Punctuality Trend Line/Area Chart */}
+            <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-stone-200/80 shadow-xs space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-sm font-black text-green-950 uppercase tracking-tight">
+                  <h3 className="text-base font-bold text-green-950">
                     Punctuality & Presence Timeline
                   </h3>
-                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                  <p className="text-xs text-stone-500 font-medium mt-0.5">
                     Daily punctuality trajectory and arrival rate fluctuations
                   </p>
                 </div>
-                <span className="px-2.5 py-1 bg-emerald-50 text-emerald-900 font-black text-[10px] rounded-full uppercase">
+                <span className="text-emerald-800 font-bold bg-emerald-50 px-2.5 py-1 rounded-lg text-xs tabular-nums">
                   Daily Logged Records
                 </span>
               </div>
               <div className="h-64 w-full">
                 <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={attendanceData.charts.timeseriesTrend} margin={{ top: 10, right: 10, left: -20, bottom: 20 }}>
+                  <AreaChart
+                    data={attendanceData.charts.timeseriesTrend}
+                    margin={{ top: 10, right: 10, left: -20, bottom: 20 }}
+                  >
                     <defs>
-                      <linearGradient id="punctualityGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.4} />
-                        <stop offset="95%" stopColor="#10b981" stopOpacity={0.0} />
+                      <linearGradient
+                        id="punctualityGradient"
+                        x1="0"
+                        y1="0"
+                        x2="0"
+                        y2="1"
+                      >
+                        <stop
+                          offset="5%"
+                          stopColor="#059669"
+                          stopOpacity={0.4}
+                        />
+                        <stop
+                          offset="95%"
+                          stopColor="#059669"
+                          stopOpacity={0.0}
+                        />
                       </linearGradient>
                     </defs>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
-                    <XAxis dataKey="date" tick={{ fontSize: 9, fill: '#6b7280' }} angle={-25} textAnchor="end" interval="preserveStartEnd" />
-                    <YAxis tick={{ fontSize: 10, fill: '#6b7280' }} domain={[0, 100]} />
-                    <Tooltip
-                      contentStyle={{ backgroundColor: '#14532d', borderRadius: '12px', border: 'none', color: '#fff', fontSize: '11px', fontWeight: 'bold' }}
-                      formatter={(val: any) => [`${val}%`, 'Punctuality Rate']}
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      vertical={false}
+                      stroke="#f5f5f4"
                     />
-                    <Area type="monotone" dataKey="punctualityRate" stroke="#10b981" strokeWidth={2.5} fillOpacity={1} fill="url(#punctualityGradient)" />
+                    <XAxis
+                      dataKey="date"
+                      tick={{ fontSize: 10, fill: '#78716c' }}
+                      angle={-25}
+                      textAnchor="end"
+                      interval="preserveStartEnd"
+                    />
+                    <YAxis
+                      tick={{ fontSize: 11, fill: '#78716c' }}
+                      domain={[0, 100]}
+                    />
+                    <Tooltip
+                      contentStyle={chartTooltipStyle}
+                      formatter={(val) => [`${val}%`, 'Punctuality Rate']}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="punctualityRate"
+                      stroke="#059669"
+                      strokeWidth={2.5}
+                      fillOpacity={1}
+                      fill="url(#punctualityGradient)"
+                    />
                   </AreaChart>
                 </ResponsiveContainer>
               </div>
             </div>
 
-            {/* Attendance Status Pie Breakdown (col-span-1) */}
-            <div className="bg-white p-6 rounded-[32px] border border-gray-100 shadow-xl space-y-4">
+            {/* Attendance Status Pie Breakdown */}
+            <div className="bg-white p-6 rounded-2xl border border-stone-200/80 shadow-xs space-y-4">
               <div>
-                <h3 className="text-sm font-black text-green-950 uppercase tracking-tight">
+                <h3 className="text-base font-bold text-green-950">
                   Status Proportions
                 </h3>
-                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                <p className="text-xs text-stone-500 font-medium mt-0.5">
                   Present, Late, Absent & On Leave distribution
                 </p>
               </div>
@@ -858,83 +1028,130 @@ export const Reports: React.FC<ReportsProps> = ({ initialType }) => {
                       outerRadius={75}
                       paddingAngle={4}
                     >
-                      {attendanceData.charts.statusDistribution.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.fill} />
-                      ))}
+                      {attendanceData.charts.statusDistribution.map(
+                        (entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.fill} />
+                        )
+                      )}
                     </Pie>
-                    <Tooltip
-                      contentStyle={{ backgroundColor: '#14532d', borderRadius: '12px', border: 'none', color: '#fff', fontSize: '11px', fontWeight: 'bold' }}
+                    <Tooltip contentStyle={chartTooltipStyle} />
+                    <Legend
+                      wrapperStyle={{ fontSize: '11px', fontWeight: 'bold' }}
                     />
-                    <Legend wrapperStyle={{ fontSize: '10px', fontWeight: 'bold' }} />
                   </PieChart>
                 </ResponsiveContainer>
               </div>
             </div>
           </div>
         )}
-      </div>
+      </section>
 
       {/* Detailed Data Table Card */}
-      <div className="bg-white rounded-[32px] border border-gray-100 shadow-xl overflow-hidden flex flex-col">
+      <section
+        aria-label="Detailed report records"
+        className="bg-white rounded-2xl border border-stone-200/80 shadow-xs overflow-hidden flex flex-col"
+      >
         {/* Table Top Header Bar */}
-        <div className="p-6 bg-gray-50 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="p-5 bg-stone-50/80 border-b border-stone-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-3">
-              <h3 className="text-lg font-black text-green-950">
+              <h3 className="text-base sm:text-lg font-bold text-green-950">
                 {reportType} Tabular Register
               </h3>
-              <span className="px-2.5 py-0.5 bg-yellow-400 text-green-950 font-black text-[10px] rounded-full uppercase tracking-wider">
+              <span className="px-2.5 py-0.5 bg-green-900 text-amber-300 font-bold text-xs rounded-full shadow-xs tabular-nums">
                 {currentRecordCount} Records
               </span>
             </div>
-            <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mt-1">
-              Live Audited Database Records • Generated on {new Date().toLocaleDateString()}
+            <p className="text-xs text-stone-500 font-medium mt-1">
+              Official institutional records updated as of {generatedAt}
             </p>
           </div>
         </div>
 
         {/* Responsive Table */}
         <div className="overflow-x-auto">
-          <table className="w-full text-left">
+          <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="border-b border-gray-100 bg-gray-50/80">
-                <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">ID</th>
-                <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Full Name</th>
-                <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Dept / Position</th>
+              <tr className="border-b border-stone-200/80 bg-stone-50/60">
+                <th
+                  scope="col"
+                  className="px-6 py-3.5 text-xs font-bold text-stone-600"
+                >
+                  ID
+                </th>
+                <th
+                  scope="col"
+                  className="px-6 py-3.5 text-xs font-bold text-stone-600"
+                >
+                  Full Name
+                </th>
+                <th
+                  scope="col"
+                  className="px-6 py-3.5 text-xs font-bold text-stone-600"
+                >
+                  Dept / Position
+                </th>
 
                 {reportType === 'Timely Report' ? (
                   <>
-                    <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] text-center">
-                      Roster Checks (P/L/A/O)
+                    <th
+                      scope="col"
+                      className="px-6 py-3.5 text-xs font-bold text-stone-600 text-center"
+                    >
+                      Roster Checks (P / L / A / O)
                     </th>
-                    <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] text-right">
-                      Punctuality
+                    <th
+                      scope="col"
+                      className="px-6 py-3.5 text-xs font-bold text-stone-600 text-right"
+                    >
+                      Punctuality Rate
                     </th>
-                    <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] text-center">
+                    <th
+                      scope="col"
+                      className="px-6 py-3.5 text-xs font-bold text-stone-600 text-center"
+                    >
                       Performance
                     </th>
                   </>
                 ) : reportType === 'Promotion Report' ? (
                   <>
-                    <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">
+                    <th
+                      scope="col"
+                      className="px-6 py-3.5 text-xs font-bold text-stone-600"
+                    >
                       Target Position & Rationale
                     </th>
-                    <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] text-center">
+                    <th
+                      scope="col"
+                      className="px-6 py-3.5 text-xs font-bold text-stone-600 text-center"
+                    >
                       Effective Date
                     </th>
-                    <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] text-right">
+                    <th
+                      scope="col"
+                      className="px-6 py-3.5 text-xs font-bold text-stone-600 text-right"
+                    >
                       Status
                     </th>
                   </>
                 ) : (
                   <>
-                    <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">
+                    <th
+                      scope="col"
+                      className="px-6 py-3.5 text-xs font-bold text-stone-600"
+                    >
                       Tenure & Education
                     </th>
-                    <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] text-center">
+                    <th
+                      scope="col"
+                      className="px-6 py-3.5 text-xs font-bold text-stone-600 text-center"
+                    >
                       Employment Date
                     </th>
-                    <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] text-right">
+                    <th
+                      scope="col"
+                      className="px-6 py-3.5 text-xs font-bold text-stone-600 text-right"
+                    >
                       Status
                     </th>
                   </>
@@ -942,15 +1159,15 @@ export const Reports: React.FC<ReportsProps> = ({ initialType }) => {
               </tr>
             </thead>
 
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-stone-100">
               {isLoading && (
                 <tr>
                   <td colSpan={6} className="px-6 py-20 text-center">
-                    <div className="flex flex-col items-center justify-center gap-3 text-green-900">
-                      <RefreshCw size={28} className="animate-spin text-green-800" />
-                      <p className="text-xs font-black uppercase tracking-widest text-green-950">
-                        Aggregating Report Analytics...
-                      </p>
+                    <div className="flex items-center justify-center gap-3">
+                      <Loader2 className="h-7 w-7 animate-spin text-green-800" />
+                      <span className="text-sm font-medium text-stone-600">
+                        Aggregating institutional report records...
+                      </span>
                     </div>
                   </td>
                 </tr>
@@ -960,32 +1177,44 @@ export const Reports: React.FC<ReportsProps> = ({ initialType }) => {
               {!isLoading &&
                 reportType === 'Employment Report' &&
                 employmentData?.records.map((emp) => (
-                  <tr key={emp.id} className="hover:bg-green-50/20 transition-colors">
-                    <td className="px-6 py-4 font-mono text-xs text-green-900 font-bold">
+                  <tr
+                    key={emp.id}
+                    className="hover:bg-stone-50/80 transition-colors"
+                  >
+                    <td className="px-6 py-4 font-mono text-xs text-green-900 font-semibold tabular-nums">
                       {emp.employeeNumber}
                     </td>
                     <td className="px-6 py-4 text-xs font-bold text-green-950">
                       {emp.fullName}
                     </td>
                     <td className="px-6 py-4">
-                      <div className="text-[11px] font-black text-green-900">{emp.department}</div>
-                      <div className="text-[10px] font-medium text-gray-500">{emp.position}</div>
+                      <div className="text-xs font-semibold text-green-950">
+                        {emp.department}
+                      </div>
+                      <div className="text-xs font-medium text-stone-500 mt-0.5">
+                        {emp.position}
+                      </div>
                     </td>
                     <td className="px-6 py-4">
-                      <div className="text-[11px] font-bold text-gray-800">{emp.serviceDuration}</div>
-                      <div className="text-[10px] text-gray-400 font-medium">{emp.educationLevel}</div>
+                      <div className="text-xs font-semibold text-stone-700">
+                        {emp.serviceDuration}
+                      </div>
+                      <div className="text-xs text-stone-500 font-medium mt-0.5">
+                        {emp.educationLevel}
+                      </div>
                     </td>
-                    <td className="px-6 py-4 text-center font-mono text-xs text-gray-600 font-bold">
+                    <td className="px-6 py-4 text-center font-mono text-xs text-stone-600 font-medium tabular-nums">
                       {emp.employmentDate}
                     </td>
                     <td className="px-6 py-4 text-right">
                       <span
-                        className={`px-2.5 py-0.5 rounded-full font-black text-[9px] uppercase tracking-wider ${
+                        className={`inline-block px-2.5 py-0.5 rounded-md font-bold text-xs ${
                           emp.status === 'ACTIVE' || emp.status === 'Active'
-                            ? 'bg-emerald-100 text-emerald-800'
-                            : emp.status === 'INACTIVE' || emp.status === 'Inactive'
-                              ? 'bg-amber-100 text-amber-800'
-                              : 'bg-gray-100 text-gray-600'
+                            ? 'bg-emerald-50 text-emerald-800'
+                            : emp.status === 'INACTIVE' ||
+                                emp.status === 'Inactive'
+                              ? 'bg-amber-50 text-amber-900'
+                              : 'bg-stone-100 text-stone-600'
                         }`}
                       >
                         {emp.status}
@@ -998,35 +1227,46 @@ export const Reports: React.FC<ReportsProps> = ({ initialType }) => {
               {!isLoading &&
                 reportType === 'Promotion Report' &&
                 promotionData?.records.map((promo) => (
-                  <tr key={promo.id} className="hover:bg-green-50/20 transition-colors">
-                    <td className="px-6 py-4 font-mono text-xs text-green-900 font-bold">
+                  <tr
+                    key={promo.id}
+                    className="hover:bg-stone-50/80 transition-colors"
+                  >
+                    <td className="px-6 py-4 font-mono text-xs text-green-900 font-semibold tabular-nums">
                       {promo.employeeNumber}
                     </td>
                     <td className="px-6 py-4 text-xs font-bold text-green-950">
                       {promo.fullName}
                     </td>
                     <td className="px-6 py-4">
-                      <div className="text-[11px] font-black text-green-900">{promo.department}</div>
-                      <div className="text-[10px] font-medium text-gray-500">Current: {promo.previousPosition}</div>
+                      <div className="text-xs font-semibold text-green-950">
+                        {promo.department}
+                      </div>
+                      <div className="text-xs font-medium text-stone-500 mt-0.5">
+                        Current: {promo.previousPosition}
+                      </div>
                     </td>
                     <td className="px-6 py-4 max-w-xs">
-                      <div className="text-[11px] font-black text-amber-900">{promo.promotedPosition}</div>
-                      <div className="text-[9px] text-gray-500 leading-snug mt-0.5">{promo.rationale}</div>
+                      <div className="text-xs font-bold text-green-950">
+                        {promo.promotedPosition}
+                      </div>
+                      <div className="text-xs text-stone-500 font-medium leading-relaxed mt-0.5">
+                        {promo.rationale}
+                      </div>
                     </td>
                     <td className="px-6 py-4 text-center">
-                      <span className="font-mono text-xs font-black text-green-950 block">
+                      <span className="font-mono text-xs font-bold text-green-950 block tabular-nums">
                         {promo.effectiveDate}
                       </span>
-                      <span className="text-[8px] font-black uppercase px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 mt-1 inline-block">
+                      <span className="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-amber-50 text-amber-900 mt-1 inline-block">
                         {promo.promotionYear}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-right">
                       <span
-                        className={`px-2.5 py-1 rounded-xl font-black text-[9px] uppercase tracking-tight ${
+                        className={`inline-block px-2.5 py-0.5 rounded-md font-bold text-xs ${
                           promo.promotionStatus.includes('Approved')
-                            ? 'bg-emerald-100 text-emerald-800'
-                            : 'bg-amber-100 text-amber-800'
+                            ? 'bg-emerald-50 text-emerald-800'
+                            : 'bg-amber-50 text-amber-900'
                         }`}
                       >
                         {promo.promotionStatus}
@@ -1039,67 +1279,89 @@ export const Reports: React.FC<ReportsProps> = ({ initialType }) => {
               {!isLoading &&
                 reportType === 'Timely Report' &&
                 attendanceData?.records.map((emp) => (
-                  <tr key={emp.id} className="hover:bg-green-50/20 transition-colors">
-                    <td className="px-6 py-4 font-mono text-xs text-green-900 font-bold">
+                  <tr
+                    key={emp.id}
+                    className="hover:bg-stone-50/80 transition-colors"
+                  >
+                    <td className="px-6 py-4 font-mono text-xs text-green-900 font-semibold tabular-nums">
                       {emp.employeeNumber}
                     </td>
                     <td className="px-6 py-4 text-xs font-bold text-green-950">
                       {emp.fullName}
                     </td>
                     <td className="px-6 py-4">
-                      <div className="text-[11px] font-black text-green-900">{emp.department}</div>
-                      <div className="text-[10px] font-medium text-gray-500">{emp.position}</div>
+                      <div className="text-xs font-semibold text-green-950">
+                        {emp.department}
+                      </div>
+                      <div className="text-xs font-medium text-stone-500 mt-0.5">
+                        {emp.position}
+                      </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-center">
-                      <div className="inline-flex items-center gap-1.5">
-                        <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 font-bold font-mono text-[9px] rounded-sm" title={`${emp.present} Present Logs`}>
+                      <div
+                        className="inline-flex items-center gap-1.5"
+                        aria-label={`Present: ${emp.present}, Late: ${emp.late}, Absent: ${emp.absent}, On Leave: ${emp.onLeave}`}
+                      >
+                        <span
+                          className="px-2 py-0.5 bg-emerald-50 text-emerald-800 font-bold font-mono text-xs rounded-md"
+                          title={`${emp.present} Present Logs`}
+                        >
                           {emp.present}P
                         </span>
-                        <span className="px-2 py-0.5 bg-amber-50 text-amber-700 font-bold font-mono text-[9px] rounded-sm" title={`${emp.late} Late Logs`}>
+                        <span
+                          className="px-2 py-0.5 bg-amber-50 text-amber-900 font-bold font-mono text-xs rounded-md"
+                          title={`${emp.late} Late Logs`}
+                        >
                           {emp.late}L
                         </span>
-                        <span className="px-2 py-0.5 bg-rose-50 text-rose-700 font-bold font-mono text-[9px] rounded-sm" title={`${emp.absent} Absent Logs`}>
+                        <span
+                          className="px-2 py-0.5 bg-rose-50 text-rose-800 font-bold font-mono text-xs rounded-md"
+                          title={`${emp.absent} Absent Logs`}
+                        >
                           {emp.absent}A
                         </span>
-                        <span className="px-2 py-0.5 bg-purple-50 text-purple-700 font-bold font-mono text-[9px] rounded-sm" title={`${emp.onLeave} On Leave Logs`}>
+                        <span
+                          className="px-2 py-0.5 bg-purple-50 text-purple-800 font-bold font-mono text-xs rounded-md"
+                          title={`${emp.onLeave} On Leave Logs`}
+                        >
                           {emp.onLeave}O
                         </span>
                       </div>
                     </td>
-                    <td className="px-6 py-4 font-mono font-black text-right text-xs">
+                    <td className="px-6 py-4 font-mono font-bold text-right text-xs">
                       <div className="flex flex-col items-end">
                         <span
-                          className={
+                          className={`tabular-nums ${
                             emp.punctualityRate >= 90
-                              ? 'text-emerald-700 font-black'
+                              ? 'text-emerald-700 font-bold'
                               : emp.punctualityRate >= 75
-                                ? 'text-amber-600 font-bold'
-                                : 'text-rose-600 font-bold'
-                          }
+                                ? 'text-amber-700 font-semibold'
+                                : 'text-rose-700 font-semibold'
+                          }`}
                         >
                           {emp.punctualityRate}%
                         </span>
-                        <span className="text-[8px] text-gray-400 font-semibold uppercase">
+                        <span className="text-[11px] text-stone-500 font-medium">
                           of {emp.totalLogs} logs
                         </span>
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-center">
                       {emp.totalLogs === 0 ? (
-                        <span className="px-2 py-0.5 bg-gray-100 text-gray-400 rounded-full font-black text-[8px] uppercase tracking-wider">
+                        <span className="px-2.5 py-0.5 bg-stone-100 text-stone-500 rounded-md font-semibold text-xs">
                           No Logs
                         </span>
                       ) : emp.punctualityRate >= 90 ? (
-                        <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-full font-black text-[8px] uppercase tracking-wider">
-                          ★ Excellent
+                        <span className="px-2.5 py-0.5 bg-emerald-50 text-emerald-800 rounded-md font-bold text-xs">
+                          Excellent
                         </span>
                       ) : emp.punctualityRate >= 75 ? (
-                        <span className="px-2 py-0.5 bg-amber-100 text-amber-800 rounded-full font-black text-[8px] uppercase tracking-wider">
+                        <span className="px-2.5 py-0.5 bg-amber-50 text-amber-900 rounded-md font-bold text-xs">
                           Satisfactory
                         </span>
                       ) : (
-                        <span className="px-2 py-0.5 bg-rose-100 text-rose-800 rounded-full font-black text-[8px] uppercase tracking-wider">
-                          Review Req
+                        <span className="px-2.5 py-0.5 bg-rose-50 text-rose-800 rounded-md font-bold text-xs">
+                          Review Needed
                         </span>
                       )}
                     </td>
@@ -1109,17 +1371,25 @@ export const Reports: React.FC<ReportsProps> = ({ initialType }) => {
               {/* Empty State */}
               {!isLoading && currentRecordCount === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-6 py-20 text-center text-gray-400 italic font-medium">
+                  <td
+                    colSpan={6}
+                    className="px-6 py-16 text-center text-stone-500"
+                  >
                     <div className="flex flex-col items-center justify-center gap-2">
-                      <Search size={32} className="text-gray-300" />
-                      <p>Your filter and search criteria returned no matching records.</p>
+                      <Search size={28} className="text-stone-300" />
+                      <p className="text-sm font-medium text-stone-600">
+                        No matching records found for the selected filter
+                        criteria.
+                      </p>
                       <button
+                        type="button"
                         onClick={() => {
                           setSelectedDepartment('');
                           setDatePreset('all');
+                          setSearchInput('');
                           setSearchQuery('');
                         }}
-                        className="text-xs font-black text-green-900 underline uppercase tracking-wider mt-2 cursor-pointer"
+                        className="text-xs font-semibold text-emerald-800 hover:text-green-950 underline mt-1 cursor-pointer focus-visible:ring-2 focus-visible:ring-green-800 focus-visible:outline-hidden"
                       >
                         Reset All Filters
                       </button>
@@ -1130,8 +1400,9 @@ export const Reports: React.FC<ReportsProps> = ({ initialType }) => {
             </tbody>
           </table>
         </div>
-      </div>
+      </section>
     </div>
   );
 };
+
 export default Reports;
