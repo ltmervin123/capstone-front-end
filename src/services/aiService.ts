@@ -40,6 +40,19 @@ export interface StreamCallbacks {
   onError?: (error: Error) => void;
 }
 
+export interface RenameConversationPayload {
+  id: string;
+  title: string;
+}
+
+export interface StreamChatPayload {
+  message: string;
+  history: ChatMessage[];
+  callbacks: StreamCallbacks;
+  conversationId?: string;
+  signal?: AbortSignal;
+}
+
 export const aiService = {
   async listConversations(): Promise<ConversationSummary[]> {
     const res = await apiRequest<ApiSuccessResponse<ConversationSummary[]>>('/ai/conversations');
@@ -70,6 +83,8 @@ export const aiService = {
       method: 'DELETE',
     });
   },
+
+  streamAiChat,
 };
 
 export async function streamAiChat(

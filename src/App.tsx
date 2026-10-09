@@ -21,7 +21,7 @@ import { PayrollRecords } from './features/hr/PayrollRecords';
 import { LeaveRecords } from './features/hr/LeaveRecords';
 import { TalentAcquisition } from './features/hr/TalentAcquisition';
 import { FeedbackInbox } from './features/hr/FeedbackInbox';
-import { AISearch } from './features/hr/AISerach';
+import { AISearch } from './features/hr/AISearch';
 import { Reports } from './features/hr/Reports';
 import { AdminDashboard } from './features/admin/AdminDashboard';
 import { NotFoundPage } from './features/common/NotFoundPage';
