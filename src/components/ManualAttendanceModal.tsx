@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { AlertCircle, Loader2 } from 'lucide-react';
+import { AlertCircle, Loader2, X } from 'lucide-react';
 import { useEmployeesQuery } from '../hooks/useEmployees';
 import { useCreateAttendance } from '../hooks/useAttendance';
 import { createAttendanceFormSchema } from '../schemas/attendance.schema';
@@ -75,19 +75,38 @@ export const ManualAttendanceModal: React.FC<ManualAttendanceModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-green-950/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-[40px] p-10 w-full max-w-lg shadow-2xl relative border-4 border-yellow-400">
-        <h3 className="text-2xl font-black text-green-900 mb-2 uppercase tracking-tighter">
-          Manual Attendance Entry
-        </h3>
-        <p className="text-gray-500 text-sm font-medium mb-8">
-          Override or add missing attendance logs
-        </p>
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="manual-attendance-title"
+      className="fixed inset-0 bg-green-950/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-200"
+    >
+      <div className="bg-white rounded-2xl p-6 sm:p-8 w-full max-w-lg shadow-xl border border-stone-200/80 relative">
+        <button
+          type="button"
+          onClick={handleClose}
+          aria-label="Close dialog"
+          className="absolute top-5 right-5 text-stone-400 hover:text-stone-700 p-1.5 rounded-lg hover:bg-stone-100 transition-colors cursor-pointer"
+        >
+          <X size={18} />
+        </button>
 
-        <form onSubmit={(e) => void handleAddRecord(e)} className="space-y-6">
+        <div className="mb-6">
+          <h2
+            id="manual-attendance-title"
+            className="text-xl sm:text-2xl font-bold text-green-950 tracking-tight"
+          >
+            Manual Attendance Entry
+          </h2>
+          <p className="text-xs text-stone-600 font-medium mt-1">
+            Override or add verified attendance logs for personnel.
+          </p>
+        </div>
+
+        <form onSubmit={(e) => void handleAddRecord(e)} className="space-y-4">
           {submitError && (
-            <div className="flex items-start gap-3 p-4 bg-red-50 rounded-2xl border border-red-100 text-red-800 text-xs">
-              <AlertCircle size={18} className="shrink-0 text-red-600 mt-0.5" />
+            <div className="flex items-start gap-3 p-3.5 bg-red-50 rounded-xl border border-red-200 text-red-800 text-xs shadow-xs">
+              <AlertCircle size={16} className="shrink-0 text-red-600 mt-0.5" />
               <div>
                 <span className="font-bold">Could not save attendance:</span> {submitError}
               </div>
@@ -95,12 +114,16 @@ export const ManualAttendanceModal: React.FC<ManualAttendanceModalProps> = ({
           )}
 
           <div>
-            <label className="text-[10px] font-black text-yellow-900 uppercase tracking-widest mb-2 block">
+            <label
+              htmlFor="manual-employee"
+              className="block text-xs font-bold text-stone-700 mb-1.5"
+            >
               Employee
             </label>
             <select
+              id="manual-employee"
               required
-              className="w-full px-6 py-4 bg-gray-50 border-none rounded-2xl font-bold text-green-950"
+              className="w-full px-3.5 py-2.5 bg-stone-50 border border-stone-200/80 rounded-xl text-xs sm:text-sm font-semibold text-green-950 focus:bg-white focus:border-green-800 focus:ring-1 focus:ring-green-800 outline-none transition-all cursor-pointer"
               value={newRecord.employeeId}
               onChange={(e) => setNewRecord({ ...newRecord, employeeId: e.target.value })}
             >
@@ -113,25 +136,33 @@ export const ManualAttendanceModal: React.FC<ManualAttendanceModalProps> = ({
             </select>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="text-[10px] font-black text-yellow-900 uppercase tracking-widest mb-2 block">
+              <label
+                htmlFor="manual-date"
+                className="block text-xs font-bold text-stone-700 mb-1.5"
+              >
                 Date
               </label>
               <input
+                id="manual-date"
                 type="date"
                 required
-                className="w-full px-6 py-4 bg-gray-50 border-none rounded-2xl font-bold text-green-950"
+                className="w-full px-3.5 py-2.5 bg-stone-50 border border-stone-200/80 rounded-xl text-xs sm:text-sm font-semibold text-green-950 focus:bg-white focus:border-green-800 focus:ring-1 focus:ring-green-800 outline-none transition-all"
                 value={newRecord.date}
                 onChange={(e) => setNewRecord({ ...newRecord, date: e.target.value })}
               />
             </div>
             <div>
-              <label className="text-[10px] font-black text-yellow-900 uppercase tracking-widest mb-2 block">
+              <label
+                htmlFor="manual-status"
+                className="block text-xs font-bold text-stone-700 mb-1.5"
+              >
                 Status
               </label>
               <select
-                className="w-full px-6 py-4 bg-gray-50 border-none rounded-2xl font-bold text-green-950"
+                id="manual-status"
+                className="w-full px-3.5 py-2.5 bg-stone-50 border border-stone-200/80 rounded-xl text-xs sm:text-sm font-semibold text-green-950 focus:bg-white focus:border-green-800 focus:ring-1 focus:ring-green-800 outline-none transition-all cursor-pointer"
                 value={newRecord.status}
                 onChange={(e) =>
                   setNewRecord({ ...newRecord, status: e.target.value as AttendanceStatus })
@@ -146,25 +177,33 @@ export const ManualAttendanceModal: React.FC<ManualAttendanceModalProps> = ({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="text-[10px] font-black text-yellow-900 uppercase tracking-widest mb-2 block text-green-600">
+              <label
+                htmlFor="manual-time-in"
+                className="block text-xs font-bold text-stone-700 mb-1.5"
+              >
                 Time In
               </label>
               <input
+                id="manual-time-in"
                 type="time"
-                className="w-full px-6 py-4 bg-gray-50 border-none rounded-2xl font-bold text-green-950"
+                className="w-full px-3.5 py-2.5 bg-stone-50 border border-stone-200/80 rounded-xl text-xs sm:text-sm font-semibold text-green-950 focus:bg-white focus:border-green-800 focus:ring-1 focus:ring-green-800 outline-none transition-all"
                 value={newRecord.timeIn}
                 onChange={(e) => setNewRecord({ ...newRecord, timeIn: e.target.value })}
               />
             </div>
             <div>
-              <label className="text-[10px] font-black text-yellow-900 uppercase tracking-widest mb-2 block text-red-600">
+              <label
+                htmlFor="manual-time-out"
+                className="block text-xs font-bold text-stone-700 mb-1.5"
+              >
                 Time Out
               </label>
               <input
+                id="manual-time-out"
                 type="time"
-                className="w-full px-6 py-4 bg-gray-50 border-none rounded-2xl font-bold text-green-950"
+                className="w-full px-3.5 py-2.5 bg-stone-50 border border-stone-200/80 rounded-xl text-xs sm:text-sm font-semibold text-green-950 focus:bg-white focus:border-green-800 focus:ring-1 focus:ring-green-800 outline-none transition-all"
                 value={newRecord.timeOut}
                 onChange={(e) => setNewRecord({ ...newRecord, timeOut: e.target.value })}
               />
@@ -172,33 +211,37 @@ export const ManualAttendanceModal: React.FC<ManualAttendanceModalProps> = ({
           </div>
 
           <div>
-            <label className="text-[10px] font-black text-yellow-900 uppercase tracking-widest mb-2 block">
+            <label
+              htmlFor="manual-remarks"
+              className="block text-xs font-bold text-stone-700 mb-1.5"
+            >
               Remarks
             </label>
             <textarea
-              className="w-full px-6 py-4 bg-gray-50 border-none rounded-2xl font-bold text-green-950 h-24"
+              id="manual-remarks"
+              className="w-full px-3.5 py-2.5 bg-stone-50 border border-stone-200/80 rounded-xl text-xs sm:text-sm font-semibold text-green-950 focus:bg-white focus:border-green-800 focus:ring-1 focus:ring-green-800 outline-none transition-all h-20 placeholder:text-stone-400"
               value={newRecord.remarks}
               onChange={(e) => setNewRecord({ ...newRecord, remarks: e.target.value })}
-              placeholder="Additional notes..."
+              placeholder="Optional notes or authorization details..."
             />
           </div>
 
-          <div className="flex gap-4 pt-4">
+          <div className="flex items-center gap-3 pt-3">
             <button
               type="button"
               onClick={handleClose}
               disabled={createAttendance.isPending}
-              className="flex-1 px-6 py-4 bg-gray-100 text-gray-500 font-black rounded-2xl hover:bg-gray-200 transition-colors uppercase text-xs tracking-widest disabled:opacity-50"
+              className="flex-1 px-4 py-2.5 bg-white border border-stone-200/80 text-stone-700 font-bold text-xs uppercase tracking-wider rounded-xl hover:bg-stone-50 transition-colors cursor-pointer disabled:opacity-50"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={createAttendance.isPending}
-              className="flex-1 px-6 py-4 bg-green-900 text-yellow-400 font-black rounded-2xl hover:bg-green-800 transition-all active:scale-95 uppercase text-xs tracking-widest disabled:opacity-60 flex items-center justify-center gap-2"
+              className="flex-1 px-4 py-2.5 bg-green-900 hover:bg-green-800 text-amber-300 font-bold text-xs uppercase tracking-wider rounded-xl shadow-xs transition-colors cursor-pointer flex items-center justify-center gap-2 disabled:opacity-60"
             >
               {createAttendance.isPending ? <Loader2 size={16} className="animate-spin" /> : null}
-              {createAttendance.isPending ? 'Saving...' : 'Save Entry'}
+              <span>{createAttendance.isPending ? 'Saving...' : 'Save Entry'}</span>
             </button>
           </div>
         </form>

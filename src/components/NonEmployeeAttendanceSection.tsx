@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Calendar,
   Search,
@@ -8,6 +8,9 @@ import {
   AlertCircle,
   Loader2,
   Users,
+  UserCheck,
+  Clock,
+  CalendarDays,
 } from 'lucide-react';
 import { useCurrentUser } from '../hooks/useAuth';
 import { useAttendanceQuery } from '../hooks/useAttendance';
@@ -41,27 +44,87 @@ export const NonEmployeeAttendanceSection: React.FC = () => {
   const [filterStatus, setFilterStatus] = useState<string>('All');
   const [showAddModal, setShowAddModal] = useState(false);
 
-  const badgeText = currentUser?.role === Role.ADMIN ? 'ADMIN OPS' : 'HR OPS';
+  const badgeText = currentUser?.role === Role.ADMIN ? 'Admin Office' : 'HR Office';
 
-  const filteredAttendance = attendance.filter((record: AttendanceRecord) => {
-    const matchesSearch =
-      record.employeeName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      record.employeeId.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesFilter = filterStatus === 'All' || record.status === filterStatus;
-    return matchesSearch && matchesFilter;
-  });
+  const {
+    presentCount,
+    lateCount,
+    absentOrLeaveCount,
+    filteredAttendance,
+  } = useMemo(() => {
+    let present = 0;
+    let late = 0;
+    let absentOrLeave = 0;
 
-  const presentCount = attendance.filter(
-    (record) => record.status === AttendanceStatus.PRESENT
-  ).length;
-  const lateCount = attendance.filter(
-    (record) => record.status === AttendanceStatus.LATE
-  ).length;
-  const absentOrLeaveCount = attendance.filter(
-    (record) =>
-      record.status === AttendanceStatus.ABSENT ||
-      record.status === AttendanceStatus.ON_LEAVE
-  ).length;
+    for (const record of attendance) {
+      if (record.status === AttendanceStatus.PRESENT) {
+        present++;
+      } else if (record.status === AttendanceStatus.LATE) {
+        late++;
+      } else if (
+        record.status === AttendanceStatus.ABSENT ||
+        record.status === AttendanceStatus.ON_LEAVE
+      ) {
+        absentOrLeave++;
+      }
+    }
+
+    const normalizedSearch = searchTerm.trim().toLowerCase();
+    const filtered = attendance.filter((record: AttendanceRecord) => {
+      const matchesSearch =
+        !normalizedSearch ||
+        record.employeeName.toLowerCase().includes(normalizedSearch) ||
+        record.employeeId.toLowerCase().includes(normalizedSearch);
+
+      const matchesFilter =
+        filterStatus === 'All'
+          ? true
+          : filterStatus === 'ABSENT_OR_LEAVE'
+            ? record.status === AttendanceStatus.ABSENT ||
+              record.status === AttendanceStatus.ON_LEAVE
+            : record.status === filterStatus;
+
+      return matchesSearch && matchesFilter;
+    });
+
+    return {
+      presentCount: present,
+      lateCount: late,
+      absentOrLeaveCount: absentOrLeave,
+      filteredAttendance: filtered,
+    };
+  }, [attendance, searchTerm, filterStatus]);
+
+  const statCards = [
+    {
+      label: 'Total Logs',
+      subtitle: 'All personnel logs',
+      value: attendance.length,
+      icon: Users,
+      iconBg: 'bg-emerald-50 text-emerald-800',
+    },
+    {
+      label: 'Present',
+      subtitle: 'On-time attendance',
+      value: presentCount,
+      icon: UserCheck,
+      iconBg: 'bg-green-50 text-green-800',
+    },
+    {
+      label: 'Late Arrivals',
+      subtitle: 'Recorded tardiness',
+      value: lateCount,
+      icon: Clock,
+      iconBg: 'bg-amber-50 text-amber-900',
+    },
+    {
+      label: 'Absent & On Leave',
+      subtitle: 'Unattended or filed leaves',
+      value: absentOrLeaveCount,
+      icon: CalendarDays,
+      iconBg: 'bg-purple-50 text-purple-800',
+    },
+  ];
 
   const handleExport = () => {
     exportToCsv<AttendanceRecord>(
@@ -80,23 +143,23 @@ export const NonEmployeeAttendanceSection: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
-      {/* Top Header */}
-      <header className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <Logo className="w-14 h-14" />
+    <div className="space-y-8 animate-in fade-in duration-300 pb-16">
+      {/* Top Header matching Dashboard */}
+      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex items-center gap-4 sm:gap-5">
+          <Logo className="w-14 h-14 sm:w-16 sm:h-16 md:w-20 md:h-20 shrink-0" />
           <div>
-            <h2 className="text-3xl font-black text-green-900 uppercase tracking-tighter">
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-green-950 tracking-tight">
               Attendance Records
-            </h2>
-            <div className="flex items-center gap-2 mt-1">
-              <span className="text-green-700 font-bold uppercase text-[11px] tracking-[0.2em]">
-                Daily clock-in/out tracking and monitoring of personnel
+            </h1>
+            <div className="flex flex-wrap items-center gap-2 mt-1.5">
+              <span className="text-xs font-semibold text-emerald-800">
+                Daily Time Tracking &amp; Personnel Attendance
               </span>
-              <span className="h-1.5 w-1.5 rounded-full bg-yellow-400" />
-              <div className="flex items-center gap-1.5 px-2 py-0.5 bg-green-900 rounded-full shadow-sm">
-                <Users size={12} className="text-yellow-400" />
-                <span className="text-[10px] font-black text-white uppercase tracking-tighter">
+              <span className="h-1.5 w-1.5 rounded-full bg-amber-400 hidden sm:inline-block" />
+              <div className="flex items-center gap-1.5 px-2.5 py-0.5 bg-green-900 text-white rounded-full shadow-xs">
+                <Users size={12} className="text-amber-300" />
+                <span className="text-[11px] font-bold tracking-wide">
                   {badgeText}
                 </span>
               </div>
@@ -104,188 +167,163 @@ export const NonEmployeeAttendanceSection: React.FC = () => {
           </div>
         </div>
 
-        <button
-          type="button"
-          onClick={() => setShowAddModal(true)}
-          className="bg-yellow-400 hover:bg-yellow-500 text-green-950 font-black px-6 py-3 rounded-xl flex items-center gap-2 transition-all shadow-lg shadow-yellow-400/20 active:scale-95 uppercase text-xs tracking-widest cursor-pointer w-fit"
-        >
-          <Plus size={18} />
-          Manual Entry
-        </button>
+        <div className="flex items-center gap-3 self-start md:self-auto">
+          <span className="inline-flex items-center gap-2 text-xs font-medium text-stone-600 bg-white border border-stone-200/80 rounded-xl px-3.5 py-2 shadow-xs">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            <span>Live Attendance Roster</span>
+          </span>
+
+          <button
+            type="button"
+            onClick={() => setShowAddModal(true)}
+            className="inline-flex items-center gap-1.5 px-4 py-2 bg-green-900 hover:bg-green-800 text-amber-300 font-bold text-xs uppercase tracking-wider rounded-xl shadow-xs transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-green-800 focus-visible:outline-hidden"
+          >
+            <Plus size={15} />
+            <span>Manual Entry</span>
+          </button>
+        </div>
       </header>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <button
-          type="button"
-          onClick={() => setFilterStatus('All')}
-          className={`p-4 rounded-2xl border text-left transition-all cursor-pointer ${
-            filterStatus === 'All'
-              ? 'bg-green-100/70 border-green-300 ring-2 ring-green-900'
-              : 'bg-white border-gray-100 hover:bg-green-50/50 shadow-sm'
-          }`}
-        >
-          <p className="text-[10px] font-black uppercase tracking-wider text-green-800">
-            Total Records
-          </p>
-          <p className="text-2xl font-black text-green-950 mt-1">
-            {attendance.length}
-          </p>
-          <p className="text-[9px] text-gray-500 font-bold mt-1">
-            All personnel logs
-          </p>
-        </button>
+      {/* Error Alert */}
+      {listError && (
+        <div className="flex items-start gap-3 p-4 bg-red-50 rounded-2xl border border-red-200 text-red-800 text-xs shadow-xs">
+          <AlertCircle size={18} className="shrink-0 text-red-600 mt-0.5" />
+          <div className="flex-1">
+            <span className="font-bold">Could not load attendance:</span> {listError}
+          </div>
+          <button
+            type="button"
+            onClick={() => void attendanceQuery.refetch()}
+            className="text-xs font-bold text-red-700 hover:underline cursor-pointer"
+          >
+            Retry Loading
+          </button>
+        </div>
+      )}
 
-        <button
-          type="button"
-          onClick={() => setFilterStatus(AttendanceStatus.PRESENT)}
-          className={`p-4 rounded-2xl border text-left transition-all cursor-pointer ${
-            filterStatus === AttendanceStatus.PRESENT
-              ? 'bg-emerald-100/70 border-emerald-300 ring-2 ring-emerald-900'
-              : 'bg-white border-gray-100 hover:bg-emerald-50/50 shadow-sm'
-          }`}
-        >
-          <p className="text-[10px] font-black uppercase tracking-wider text-emerald-800">
-            Present
-          </p>
-          <p className="text-2xl font-black text-emerald-950 mt-1">
-            {presentCount}
-          </p>
-          <p className="text-[9px] text-emerald-700 font-bold mt-1">
-            On-time attendance
-          </p>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setFilterStatus(AttendanceStatus.LATE)}
-          className={`p-4 rounded-2xl border text-left transition-all cursor-pointer ${
-            filterStatus === AttendanceStatus.LATE
-              ? 'bg-yellow-100/70 border-yellow-300 ring-2 ring-yellow-700'
-              : 'bg-white border-gray-100 hover:bg-yellow-50/50 shadow-sm'
-          }`}
-        >
-          <p className="text-[10px] font-black uppercase tracking-wider text-yellow-800">
-            Late Arrivals
-          </p>
-          <p className="text-2xl font-black text-yellow-950 mt-1">
-            {lateCount}
-          </p>
-          <p className="text-[9px] text-yellow-700 font-bold mt-1">
-            Tardiness logs
-          </p>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setFilterStatus(AttendanceStatus.ABSENT)}
-          className={`p-4 rounded-2xl border text-left transition-all cursor-pointer ${
-            filterStatus === AttendanceStatus.ABSENT
-              ? 'bg-red-100/70 border-red-300 ring-2 ring-red-700'
-              : 'bg-white border-gray-100 hover:bg-red-50/50 shadow-sm'
-          }`}
-        >
-          <p className="text-[10px] font-black uppercase tracking-wider text-red-800">
-            Absences / Leaves
-          </p>
-          <p className="text-2xl font-black text-red-950 mt-1">
-            {absentOrLeaveCount}
-          </p>
-          <p className="text-[9px] text-red-700 font-bold mt-1">
-            Unattended / filed leaves
-          </p>
-        </button>
-      </div>
-
-      {/* Main Table Card */}
-      <div className="bg-white rounded-[32px] p-8 shadow-sm border border-gray-100">
-        {listError && (
-          <div className="flex items-start gap-3 p-4 mb-6 bg-red-50 rounded-2xl border border-red-100 text-red-800 text-xs">
-            <AlertCircle size={18} className="shrink-0 text-red-600 mt-0.5" />
-            <div className="flex-1">
-              <span className="font-bold">Could not load attendance:</span> {listError}
+      {/* KPI Overview Cards matching Dashboard */}
+      <section
+        aria-label="Attendance summary metrics"
+        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"
+      >
+        {statCards.map((stat, i) => (
+          <div
+            key={i}
+            className="p-5 bg-white rounded-2xl border border-stone-200/80 shadow-xs flex flex-col items-center justify-center text-center select-none"
+          >
+            <div className={`p-3 rounded-xl ${stat.iconBg} mb-3`}>
+              <stat.icon size={22} />
             </div>
-            <button
-              type="button"
-              onClick={() => void attendanceQuery.refetch()}
-              className="text-[10px] font-black uppercase tracking-wider text-red-700 hover:underline cursor-pointer"
-            >
-              Retry
-            </button>
+            <h2 className="text-3xl font-extrabold text-green-950 tracking-tight tabular-nums leading-none">
+              {stat.value}
+            </h2>
+            <p className="text-sm font-bold text-stone-800 mt-2">
+              {stat.label}
+            </p>
+            <p className="text-xs text-stone-500 mt-0.5">{stat.subtitle}</p>
           </div>
-        )}
+        ))}
+      </section>
 
-        <div className="flex flex-col md:flex-row gap-4 mb-8">
-          <div className="flex-1 relative animate-in fade-in duration-300">
-            <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-            <input
-              type="text"
-              placeholder="Search employee name or ID..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-14 pr-6 py-4 bg-gray-50 border-none rounded-[24px] outline-none focus:ring-2 focus:ring-yellow-400 font-bold text-green-950"
-            />
+      {/* Main Roster & Controls Section */}
+      <section
+        aria-label="Attendance records and logs"
+        className="bg-white rounded-2xl border border-stone-200/80 p-6 shadow-xs space-y-6"
+      >
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-stone-100">
+          <div>
+            <h2 className="text-lg sm:text-xl font-bold text-green-950 tracking-tight flex items-center gap-2">
+              <Clock size={20} className="text-amber-500" />
+              Daily Attendance Roster
+            </h2>
+            <p className="text-xs sm:text-sm text-stone-600 mt-0.5">
+              Review staff clock-in/out logs, biometric timestamps, and attendance status.
+            </p>
           </div>
 
-          <div className="flex gap-4 ml-auto">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+            {/* Search Input */}
+            <div className="relative min-w-[240px] md:min-w-[280px]">
+              <Search
+                className="absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-400 pointer-events-none"
+                size={16}
+              />
+              <input
+                type="text"
+                aria-label="Search attendance by employee name or ID"
+                placeholder="Search employee name or ID..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 bg-stone-50 border border-stone-200/80 rounded-xl text-xs sm:text-sm font-medium text-green-950 placeholder:text-stone-400 focus:bg-white focus:border-green-800 focus:ring-1 focus:ring-green-800 outline-none transition-all"
+              />
+            </div>
+
+            {/* Filter Dropdown */}
             <div className="relative">
-              <Filter className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+              <Filter
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400 pointer-events-none"
+                size={14}
+              />
               <select
-                className="pl-10 pr-10 py-4 bg-gray-50 border-none rounded-[24px] font-bold text-green-950 appearance-none focus:ring-2 focus:ring-yellow-400 outline-none"
+                aria-label="Filter attendance records by status"
                 value={filterStatus}
                 onChange={(e) => setFilterStatus(e.target.value)}
+                className="pl-8 pr-8 py-2 bg-stone-50 border border-stone-200/80 rounded-xl text-xs font-semibold text-stone-800 focus:bg-white focus:border-green-800 focus:ring-1 focus:ring-green-800 outline-none transition-all appearance-none cursor-pointer"
               >
                 <option value="All">All Statuses</option>
-                {Object.values(AttendanceStatus).map((status) => (
-                  <option key={status} value={status}>
-                    {status}
-                  </option>
-                ))}
+                <option value={AttendanceStatus.PRESENT}>Present</option>
+                <option value={AttendanceStatus.LATE}>Late</option>
+                <option value={AttendanceStatus.ABSENT}>Absent</option>
+                <option value={AttendanceStatus.ON_LEAVE}>On Leave</option>
+                <option value="ABSENT_OR_LEAVE">Absent &amp; On Leave</option>
               </select>
             </div>
+
+            {/* Export CSV Button */}
             <button
               type="button"
               onClick={handleExport}
-              className="px-6 py-4 bg-green-900 text-yellow-400 font-black rounded-[24px] flex items-center gap-2 hover:bg-green-800 transition-colors uppercase text-xs tracking-widest cursor-pointer"
+              className="inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-green-900 hover:bg-green-800 text-amber-300 font-bold text-xs uppercase tracking-wider rounded-xl shadow-xs transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-green-800 focus-visible:outline-hidden shrink-0"
             >
-              <Download size={18} />
-              Export
+              <Download size={14} />
+              <span>Export CSV</span>
             </button>
           </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full">
+        {/* Table Container */}
+        <div className="overflow-x-auto rounded-xl border border-stone-200/80">
+          <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-green-900 text-yellow-400 text-left">
-                <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest rounded-tl-[24px]">
+              <tr className="bg-stone-50 border-b border-stone-200/80 text-stone-600">
+                <th scope="col" className="px-6 py-3.5 text-xs font-bold text-stone-700 tracking-wide">
                   Employee
                 </th>
-                <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest">
+                <th scope="col" className="px-6 py-3.5 text-xs font-bold text-stone-700 tracking-wide">
                   Date
                 </th>
-                <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest">
+                <th scope="col" className="px-6 py-3.5 text-xs font-bold text-stone-700 tracking-wide">
                   Time In
                 </th>
-                <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest">
+                <th scope="col" className="px-6 py-3.5 text-xs font-bold text-stone-700 tracking-wide">
                   Time Out
                 </th>
-                <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest">
+                <th scope="col" className="px-6 py-3.5 text-xs font-bold text-stone-700 tracking-wide">
                   Status
                 </th>
-                <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest rounded-tr-[24px]">
+                <th scope="col" className="px-6 py-3.5 text-xs font-bold text-stone-700 tracking-wide">
                   Remarks
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-stone-100 bg-white">
               {listLoading && (
                 <tr>
-                  <td colSpan={6} className="px-8 py-20 text-center">
-                    <div className="flex flex-col items-center gap-3 text-green-900">
-                      <Loader2 size={32} className="animate-spin" />
-                      <p className="font-black uppercase text-xs tracking-[0.3em]">
-                        Loading attendance...
+                  <td colSpan={6} className="px-6 py-16 text-center">
+                    <div className="flex flex-col items-center justify-center gap-3 text-stone-600">
+                      <Loader2 size={28} className="animate-spin text-green-800" />
+                      <p className="font-semibold text-xs text-stone-600">
+                        Loading attendance records...
                       </p>
                     </div>
                   </td>
@@ -293,49 +331,58 @@ export const NonEmployeeAttendanceSection: React.FC = () => {
               )}
               {!listLoading &&
                 filteredAttendance.map((record) => (
-                  <tr key={record.id} className="hover:bg-gray-50 transition-colors group">
-                    <td className="px-8 py-5">
+                  <tr key={record.id} className="hover:bg-stone-50/70 transition-colors group">
+                    <td className="px-6 py-4">
                       <div>
-                        <p className="font-black text-green-950 leading-none">
+                        <p className="font-bold text-green-950 text-sm leading-tight">
                           {record.employeeName}
                         </p>
-                        <p className="text-[10px] text-gray-400 mt-1 font-bold uppercase">
-                          {record.employeeId}
+                        <p className="text-xs text-stone-500 font-medium mt-0.5 tabular-nums">
+                          ID: {record.employeeId}
                         </p>
                       </div>
                     </td>
-                    <td className="px-8 py-5 text-sm font-bold text-green-800">{record.date}</td>
-                    <td className="px-8 py-5">
-                      <span className="font-mono text-xs font-bold text-gray-500">
+                    <td className="px-6 py-4 text-xs font-semibold text-stone-700 tabular-nums">
+                      {record.date}
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="font-mono text-xs font-semibold text-stone-600 tabular-nums">
                         {formatAttendanceTime(record.timeIn)}
                       </span>
                     </td>
-                    <td className="px-8 py-5">
-                      <span className="font-mono text-xs font-bold text-gray-500">
+                    <td className="px-6 py-4">
+                      <span className="font-mono text-xs font-semibold text-stone-600 tabular-nums">
                         {formatAttendanceTime(record.timeOut)}
                       </span>
                     </td>
-                    <td className="px-8 py-5">
+                    <td className="px-6 py-4">
                       <span
-                        className={`px-3 py-1 rounded-full text-[10px] font-black border uppercase tracking-tighter flex items-center gap-1.5 w-fit ${getStatusColor(
+                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border tabular-nums ${getStatusColor(
                           record.status
                         )}`}
                       >
                         {getStatusIcon(record.status)}
-                        {record.status}
+                        <span>{record.status}</span>
                       </span>
                     </td>
-                    <td className="px-8 py-5 text-xs text-gray-500 italic">
-                      {record.remarks || '--'}
+                    <td className="px-6 py-4 text-xs text-stone-500">
+                      {record.remarks ? (
+                        <span className="italic">{record.remarks}</span>
+                      ) : (
+                        <span className="text-stone-300">--</span>
+                      )}
                     </td>
                   </tr>
                 ))}
               {!listLoading && filteredAttendance.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-8 py-20 text-center text-gray-400">
-                    <Calendar size={48} className="mx-auto mb-4 opacity-20" />
-                    <p className="font-bold uppercase tracking-widest text-xs">
+                  <td colSpan={6} className="px-6 py-16 text-center text-stone-400">
+                    <Calendar size={40} className="mx-auto mb-3 text-stone-300 stroke-1" />
+                    <p className="font-bold text-stone-700 text-sm">
                       No attendance records found
+                    </p>
+                    <p className="text-xs text-stone-500 mt-1">
+                      Try adjusting your search criteria or filter options.
                     </p>
                   </td>
                 </tr>
@@ -343,7 +390,27 @@ export const NonEmployeeAttendanceSection: React.FC = () => {
             </tbody>
           </table>
         </div>
-      </div>
+
+        {/* Table summary & reset */}
+        <div className="flex flex-col sm:flex-row items-center justify-between text-xs text-stone-600 pt-1 gap-2">
+          <span>
+            Showing <strong className="text-green-950 font-bold">{filteredAttendance.length}</strong> of{' '}
+            <strong className="text-green-950 font-bold">{attendance.length}</strong> total records
+          </span>
+          {(filterStatus !== 'All' || searchTerm.trim() !== '') && (
+            <button
+              type="button"
+              onClick={() => {
+                setFilterStatus('All');
+                setSearchTerm('');
+              }}
+              className="text-emerald-800 hover:text-green-950 font-semibold hover:underline cursor-pointer"
+            >
+              Reset all filters
+            </button>
+          )}
+        </div>
+      </section>
 
       {/* Manual Entry Modal */}
       <ManualAttendanceModal

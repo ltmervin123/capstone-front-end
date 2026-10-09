@@ -5,15 +5,15 @@ import { AttendanceStatus } from '../types/types';
 export const getStatusColor = (status: AttendanceStatus): string => {
   switch (status) {
     case AttendanceStatus.PRESENT:
-      return 'bg-green-100 text-green-700 border-green-200';
+      return 'bg-emerald-50 text-emerald-800 border-emerald-200';
     case AttendanceStatus.LATE:
-      return 'bg-yellow-100 text-yellow-700 border-yellow-200';
+      return 'bg-amber-50 text-amber-900 border-amber-200';
     case AttendanceStatus.ABSENT:
-      return 'bg-red-100 text-red-700 border-red-200';
+      return 'bg-rose-50 text-rose-800 border-rose-200';
     case AttendanceStatus.ON_LEAVE:
-      return 'bg-blue-100 text-blue-700 border-blue-200';
+      return 'bg-purple-50 text-purple-800 border-purple-200';
     default:
-      return 'bg-gray-100 text-gray-700 border-gray-200';
+      return 'bg-stone-100 text-stone-700 border-stone-200';
   }
 };
 
@@ -33,13 +33,13 @@ export const formatAttendanceTime = (value: string | undefined): string => {
 export const getStatusIcon = (status: AttendanceStatus): React.ReactNode => {
   switch (status) {
     case AttendanceStatus.PRESENT:
-      return <CheckCircle2 size={12} />;
+      return <CheckCircle2 size={13} className="text-emerald-700" />;
     case AttendanceStatus.LATE:
-      return <Clock size={12} />;
+      return <Clock size={13} className="text-amber-800" />;
     case AttendanceStatus.ABSENT:
-      return <XCircle size={12} />;
+      return <XCircle size={13} className="text-rose-700" />;
     case AttendanceStatus.ON_LEAVE:
-      return <AlertCircle size={12} />;
+      return <AlertCircle size={13} className="text-purple-700" />;
     default:
       return null;
   }
