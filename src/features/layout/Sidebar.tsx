@@ -1,52 +1,86 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { 
   LogOut, 
-  Menu,
-  X,
-  KeyRound,
+  Menu, 
+  X, 
+  KeyRound, 
+  ChevronDown,
+  ShieldCheck,
+  UserCheck
 } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 import { Logo } from '../../assets/common/Logo';
 import { ChangePasswordModal } from '../auth/ChangePasswordModal';
 import { useAuthStore } from '../../stores/authStore';
 import { useLogout } from '../../hooks/useAuth';
 import { getSidebarRoutes } from '../../routes/landingPolicy';
+import type { RouteItem } from '../../routes/manifest';
+import { Role } from '../../types/types';
 
 interface SidebarProps {
   className?: string;
 }
 
-export const Sidebar: React.FC<SidebarProps> = () => {
-  const [isOpen, setIsOpen] = useState(typeof window !== 'undefined' ? window.innerWidth >= 1024 : true);
+export const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
+  const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
+
   const location = useLocation();
   const navigate = useNavigate();
-
   const user = useAuthStore((state) => state.user);
   const logoutMutation = useLogout();
+  const mobileToggleRef = useRef<HTMLButtonElement>(null);
 
+  // Memoize route calculation
+  const menuItems = useMemo(() => {
+    return user ? getSidebarRoutes(user) : [];
+  }, [user]);
+
+  // Route active evaluation
+  const isRouteActive = useCallback((path: string, exact: boolean = false) => {
+    if (exact || path === '/dashboard') {
+      return location.pathname === path;
+    }
+    return location.pathname === path || location.pathname.startsWith(`${path}/`);
+  }, [location.pathname]);
+
+  // Auto-expand accordion when a child route is active
   useEffect(() => {
-    const handleResize = () => {
-      if (window.innerWidth >= 1024) {
-        setIsOpen(true);
-      } else {
-        setIsOpen(false);
+    menuItems.forEach((item) => {
+      if (item.subItems?.some((sub) => location.pathname === sub.path)) {
+        setExpandedGroups((prev) => ({ ...prev, [item.id]: true }));
+      }
+    });
+  }, [location.pathname, menuItems]);
+
+  // Handle mobile drawer keyboard accessibility & scroll lock
+  useEffect(() => {
+    if (!isMobileOpen) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsMobileOpen(false);
+        mobileToggleRef.current?.focus();
       }
     };
-    window.addEventListener('resize', handleResize);
-    handleResize();
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isMobileOpen]);
 
   if (!user) return null;
 
-  const menuItems = getSidebarRoutes(user);
-
   const handleNavClick = (path: string) => {
     navigate(path);
-    if (window.innerWidth < 1024) {
-      setIsOpen(false);
-    }
+    setIsMobileOpen(false);
   };
 
   const handleLogout = () => {
@@ -54,125 +88,261 @@ export const Sidebar: React.FC<SidebarProps> = () => {
     navigate('/login');
   };
 
-  const isRouteActive = (path: string, exact: boolean = false) => {
-    if (exact || path === '/dashboard') {
-      return location.pathname === path;
+  const toggleGroup = (id: string) => {
+    setExpandedGroups((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const formatRoleName = (role: Role) => {
+    switch (role) {
+      case Role.ADMIN:
+        return 'Administrator';
+      case Role.HR:
+        return 'HR Officer';
+      case Role.EMPLOYEE:
+        return 'Employee';
+      default:
+        return role;
     }
-    return location.pathname === path || location.pathname.startsWith(`${path}/`);
   };
 
   return (
     <>
-      {/* Mobile Toggle Button */}
-      <button 
-        onClick={() => setIsOpen(!isOpen)}
-        className="lg:hidden fixed top-4 left-4 z-50 p-2.5 bg-green-800 text-yellow-400 rounded-xl shadow-lg hover:bg-green-700 transition-colors focus:outline-none"
-        aria-label="Toggle navigation menu"
+      {/* Mobile Top Bar */}
+      <header className="lg:hidden fixed top-0 left-0 right-0 z-30 h-16 bg-[#0c2415] border-b border-emerald-900/50 px-4 flex items-center justify-between shadow-md">
+        <button
+          ref={mobileToggleRef}
+          type="button"
+          onClick={() => setIsMobileOpen((prev) => !prev)}
+          className="flex items-center justify-center min-w-[44px] min-h-[44px] p-2.5 rounded-xl bg-emerald-900/70 text-amber-300 hover:bg-emerald-800 hover:text-amber-200 transition-colors focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0c2415] focus-visible:outline-hidden cursor-pointer"
+          aria-label={isMobileOpen ? 'Close navigation drawer' : 'Open navigation drawer'}
+          aria-expanded={isMobileOpen}
+          aria-controls="primary-sidebar"
+        >
+          {isMobileOpen ? <X size={22} aria-hidden="true" /> : <Menu size={22} aria-hidden="true" />}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => handleNavClick('/')}
+          className="flex items-center gap-2.5 rounded-lg p-1 focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:outline-hidden cursor-pointer"
+          aria-label="NMC-HR Home"
+        >
+          <Logo className="w-8 h-8" />
+          <span className="font-extrabold tracking-tight text-white text-base">
+            NMC<span className="text-amber-400">-HR</span>
+          </span>
+        </button>
+
+        <div className="w-[44px]" aria-hidden="true" />
+      </header>
+
+      {/* Backdrop overlay for mobile drawer */}
+      <AnimatePresence>
+        {isMobileOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            onClick={() => setIsMobileOpen(false)}
+            className="lg:hidden fixed inset-0 bg-black/70 backdrop-blur-xs z-40 cursor-pointer"
+            aria-hidden="true"
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Main Sidebar Navigation */}
+      <aside
+        id="primary-sidebar"
+        aria-label="Main Navigation"
+        className={`
+          fixed inset-y-0 left-0 z-50 w-72 bg-[#0c2415] text-emerald-50 flex flex-col border-r border-emerald-900/60 shadow-2xl transition-transform duration-300 ease-in-out
+          ${isMobileOpen ? 'translate-x-0' : '-translate-x-full'}
+          lg:translate-x-0 lg:static lg:h-screen lg:shrink-0 lg:z-30 lg:shadow-none ${className}
+        `}
       >
-        {isOpen ? <X size={22} /> : <Menu size={22} />}
-      </button>
-
-      {/* Backdrop overlay for mobile/tablet */}
-      {isOpen && (
-        <div 
-          onClick={() => setIsOpen(false)}
-          className="lg:hidden fixed inset-0 bg-black/60 backdrop-blur-xs z-30 transition-opacity animate-in fade-in duration-200"
-        />
-      )}
-
-      <aside className={`
-        fixed inset-y-0 left-0 z-40 w-64 bg-green-900 text-white transform transition-transform duration-300 ease-in-out
-        ${isOpen ? 'translate-x-0' : '-translate-x-full'}
-        lg:translate-x-0 lg:static lg:h-screen lg:shrink-0
-      `}>
-        <div className="flex flex-col h-full">
-          {/* Logo Section */}
-          <div 
+        {/* Brand Header */}
+        <div className="p-5 border-b border-emerald-900/50 bg-[#081a0f] flex items-center justify-between shrink-0">
+          <button
+            type="button"
             onClick={() => handleNavClick('/')}
-            className="p-6 bg-green-950 flex items-center gap-4 group cursor-pointer"
+            className="group flex items-center gap-3.5 text-left rounded-xl p-1.5 -m-1.5 focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:ring-offset-2 focus-visible:ring-offset-[#081a0f] focus-visible:outline-hidden cursor-pointer"
+            aria-label="NMC-HR Personnel Hub, return to home"
           >
-            <Logo className="w-12 h-12" />
+            <div className="relative p-1 rounded-xl bg-white/5 border border-white/10 group-hover:border-amber-400/50 transition-colors">
+              <Logo className="w-10 h-10" />
+            </div>
             <div>
-              <h1 className="text-xl font-black tracking-tight text-white uppercase leading-none">NMC-HR</h1>
-              <p className="text-[9px] uppercase tracking-[0.2em] text-green-400 font-black mt-1">Personnel Hub</p>
+              <div className="text-lg font-black tracking-tight text-white uppercase leading-none group-hover:text-amber-300 transition-colors">
+                NMC<span className="text-amber-400">-HR</span>
+              </div>
+              <div className="text-[11px] uppercase tracking-[0.18em] text-emerald-400 font-bold mt-1">
+                Personnel Hub
+              </div>
+            </div>
+          </button>
+
+          {/* Close button for mobile inside drawer */}
+          <button
+            type="button"
+            onClick={() => setIsMobileOpen(false)}
+            className="lg:hidden flex items-center justify-center min-w-[40px] min-h-[40px] rounded-lg text-emerald-300 hover:text-white hover:bg-emerald-800/50 transition-colors focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:outline-hidden cursor-pointer"
+            aria-label="Close navigation sidebar"
+          >
+            <X size={20} aria-hidden="true" />
+          </button>
+        </div>
+
+        {/* Navigation Items List */}
+        <nav 
+          aria-label="Primary"
+          className="flex-1 px-3 py-5 space-y-1.5 overflow-y-auto scrollbar-thin scrollbar-thumb-emerald-800/60 scrollbar-track-transparent"
+        >
+          {menuItems.map((item: RouteItem) => {
+            const hasSub = !!item.subItems && item.subItems.length > 0;
+            const isParentActive = isRouteActive(item.path, item.path === '/dashboard');
+            const isExpanded = !!expandedGroups[item.id];
+            const Icon = item.icon;
+
+            return (
+              <div key={item.id} className="space-y-1">
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => handleNavClick(item.path)}
+                    aria-current={isParentActive ? 'page' : undefined}
+                    className={`
+                      flex-1 min-h-[44px] flex items-center gap-3.5 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-150 group cursor-pointer text-left
+                      focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:ring-offset-1 focus-visible:ring-offset-[#0c2415] focus-visible:outline-hidden
+                      ${isParentActive
+                        ? 'bg-amber-400 text-emerald-950 font-bold shadow-md shadow-amber-950/20'
+                        : 'text-emerald-100 hover:bg-emerald-900/60 hover:text-white'}
+                    `}
+                  >
+                    <Icon
+                      size={20}
+                      aria-hidden="true"
+                      className={`shrink-0 transition-colors ${
+                        isParentActive 
+                          ? 'text-emerald-950' 
+                          : 'text-amber-300/80 group-hover:text-amber-300'
+                      }`}
+                    />
+                    <span className="truncate">{item.label}</span>
+                  </button>
+
+                  {/* Sub-item disclosure toggle */}
+                  {hasSub && (
+                    <button
+                      type="button"
+                      onClick={() => toggleGroup(item.id)}
+                      aria-expanded={isExpanded}
+                      aria-label={`${isExpanded ? 'Collapse' : 'Expand'} ${item.label} sub-items`}
+                      className="min-w-[40px] min-h-[44px] flex items-center justify-center rounded-lg text-emerald-300 hover:text-white hover:bg-emerald-800/50 transition-colors focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:outline-hidden cursor-pointer"
+                    >
+                      <ChevronDown
+                        size={16}
+                        aria-hidden="true"
+                        className={`transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
+                      />
+                    </button>
+                  )}
+                </div>
+
+                {/* Collapsible Sub-Items */}
+                {hasSub && (
+                  <AnimatePresence initial={false}>
+                    {isExpanded && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        transition={{ duration: 0.2, ease: 'easeInOut' }}
+                        className="overflow-hidden pl-6 pr-1 space-y-1"
+                      >
+                        {item.subItems!.map((sub) => {
+                          const isSubActive = location.pathname === sub.path;
+                          const SubIcon = sub.icon;
+
+                          return (
+                            <button
+                              key={sub.id}
+                              type="button"
+                              onClick={() => handleNavClick(sub.path)}
+                              aria-current={isSubActive ? 'page' : undefined}
+                              className={`
+                                w-full min-h-[40px] flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-150 group cursor-pointer text-left
+                                focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:outline-hidden
+                                ${isSubActive
+                                  ? 'bg-amber-400/20 text-amber-300 font-bold border-l border-amber-400'
+                                  : 'text-emerald-200/90 hover:bg-emerald-900/50 hover:text-white'}
+                              `}
+                            >
+                              <SubIcon
+                                size={15}
+                                aria-hidden="true"
+                                className={isSubActive ? 'text-amber-300' : 'text-emerald-400/80 group-hover:text-emerald-300'}
+                              />
+                              <span className="truncate">{sub.label}</span>
+                            </button>
+                          );
+                        })}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                )}
+              </div>
+            );
+          })}
+        </nav>
+
+        {/* User Card & Administrative Actions Footer */}
+        <div className="p-4 border-t border-emerald-900/50 bg-[#081a0f] shrink-0 space-y-3">
+          {/* User Profile Summary */}
+          <div className="flex items-center gap-3 p-2.5 bg-emerald-950/90 border border-emerald-900/50 rounded-xl">
+            <div 
+              className="w-10 h-10 rounded-full bg-amber-400 text-emerald-950 font-black flex items-center justify-center text-base shrink-0 shadow-xs"
+              aria-hidden="true"
+            >
+              {user.username.charAt(0).toUpperCase()}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-bold text-white truncate" title={user.username}>
+                {user.username}
+              </p>
+              <div className="flex items-center gap-1.5 mt-0.5">
+                {user.role === Role.ADMIN ? (
+                  <ShieldCheck size={13} className="text-amber-400 shrink-0" aria-hidden="true" />
+                ) : (
+                  <UserCheck size={13} className="text-emerald-400 shrink-0" aria-hidden="true" />
+                )}
+                <span className="text-[11px] text-amber-300/90 font-bold uppercase tracking-wider truncate">
+                  {formatRoleName(user.role)}
+                </span>
+              </div>
             </div>
           </div>
 
-          {/* Navigation */}
-          <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
-            {menuItems.map((item) => {
-              const active = isRouteActive(item.path, item.path === '/dashboard');
-              const Icon = item.icon;
-
-              return (
-                <React.Fragment key={item.id}>
-                  <button
-                    onClick={() => handleNavClick(item.path)}
-                    className={`
-                      w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group cursor-pointer
-                      ${active 
-                        ? 'bg-yellow-400 text-green-950 font-bold shadow-lg shadow-yellow-900/20' 
-                        : 'text-green-100 hover:bg-green-800 hover:text-white'}
-                    `}
-                  >
-                    <Icon size={20} className={active ? 'text-green-900' : 'text-yellow-500 opacity-70 group-hover:opacity-100 transition-opacity'} />
-                    <span className="flex-1 text-left">{item.label}</span>
-                  </button>
-                  
-                  {/* Sub Items */}
-                  {item.subItems && (
-                    <div className="ml-6 space-y-1 mt-1 mb-2">
-                      {item.subItems.map((sub) => {
-                        const subActive = location.pathname === sub.path;
-                        const SubIcon = sub.icon;
-
-                        return (
-                          <button
-                            key={sub.id}
-                            onClick={() => handleNavClick(sub.path)}
-                            className={`
-                              w-full flex items-center gap-3 px-4 py-2 rounded-lg transition-all duration-200 group text-xs cursor-pointer
-                              ${subActive 
-                                ? 'bg-yellow-400/20 text-yellow-400 font-bold' 
-                                : 'text-green-300 hover:bg-green-800 hover:text-white'}
-                            `}
-                          >
-                            <SubIcon size={14} className={subActive ? 'text-yellow-400' : 'text-yellow-500 opacity-50 group-hover:opacity-100'} />
-                            <span>{sub.label}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-                </React.Fragment>
-              );
-            })}
-          </nav>
-
-          {/* User Section */}
-          <div className="p-4 border-t border-green-800 shrink-0">
-            <div className="flex items-center gap-3 p-3 bg-green-800/50 rounded-xl mb-4">
-              <div className="w-10 h-10 rounded-full bg-yellow-500 flex items-center justify-center font-bold text-green-950 text-lg">
-                {user.username.charAt(0).toUpperCase()}
-              </div>
-              <div className="flex-1 overflow-hidden">
-                <p className="text-sm font-bold truncate text-white">{user.username}</p>
-                <p className="text-[10px] text-yellow-400 uppercase font-bold tracking-tighter opacity-80">{user.role}</p>
-              </div>
-            </div>
+          {/* Action Buttons */}
+          <div className="grid grid-cols-2 gap-2">
             <button
+              type="button"
               onClick={() => setIsChangePasswordOpen(true)}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2 mb-2 text-sm font-bold bg-green-800 text-yellow-400 rounded-xl hover:bg-green-700 transition-colors cursor-pointer"
+              className="min-h-[44px] flex items-center justify-center gap-1.5 px-2.5 py-2 text-xs font-bold bg-emerald-900/70 hover:bg-emerald-800 text-amber-300 hover:text-amber-200 border border-emerald-800/60 rounded-xl transition-colors focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:outline-hidden cursor-pointer"
+              title="Change Account Password"
             >
-              <KeyRound size={16} />
-              Change Password
+              <KeyRound size={15} aria-hidden="true" />
+              <span>Password</span>
             </button>
+
             <button
+              type="button"
               onClick={handleLogout}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-bold bg-yellow-400 text-green-950 rounded-xl hover:bg-yellow-300 transition-colors shadow-md cursor-pointer"
+              className="min-h-[44px] flex items-center justify-center gap-1.5 px-2.5 py-2 text-xs font-bold bg-amber-400 hover:bg-amber-300 text-emerald-950 rounded-xl transition-colors shadow-sm focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:outline-hidden cursor-pointer"
+              title="Sign Out of Session"
             >
-              <LogOut size={16} />
-              Logout
+              <LogOut size={15} aria-hidden="true" />
+              <span>Logout</span>
             </button>
           </div>
         </div>
