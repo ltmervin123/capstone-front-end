@@ -461,11 +461,6 @@ export const AdminDashboard: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2.5 self-start md:self-auto">
-          <span className="inline-flex items-center gap-2 text-xs font-medium text-stone-600 bg-white border border-stone-200/80 rounded-xl px-3.5 py-2 shadow-xs">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span>Active Session ({currentUser?.username || 'Admin'})</span>
-          </span>
-
           {activeTab === 'registry' && (
             <button
               type="button"
@@ -538,7 +533,8 @@ export const AdminDashboard: React.FC = () => {
         aria-label="Key personnel metrics"
         className="grid grid-cols-1 sm:grid-cols-3 gap-4"
       >
-        {statCards.map((stat, i) => {          return (
+        {statCards.map((stat, i) => {
+          return (
             <motion.div
               key={i}
               role="button"

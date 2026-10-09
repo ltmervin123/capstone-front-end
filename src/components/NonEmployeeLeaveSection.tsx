@@ -37,7 +37,9 @@ export const NonEmployeeLeaveSection: React.FC = () => {
 
   const [filterStatus, setFilterStatus] = useState<string>('All');
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedRecord, setSelectedRecord] = useState<LeaveRecord | null>(null);
+  const [selectedRecord, setSelectedRecord] = useState<LeaveRecord | null>(
+    null
+  );
   const [actionConfirm, setActionConfirm] = useState<{
     type: ActionType;
     record: LeaveRecord | null;
@@ -69,7 +71,8 @@ export const NonEmployeeLeaveSection: React.FC = () => {
     return matchesSearch && matchesFilter;
   });
 
-  const badgeText = currentUser?.role === Role.ADMIN ? 'Admin Office' : 'HR Office';
+  const badgeText =
+    currentUser?.role === Role.ADMIN ? 'Admin Office' : 'HR Office';
 
   const statCards = [
     {
@@ -160,23 +163,6 @@ export const NonEmployeeLeaveSection: React.FC = () => {
             </div>
           </div>
         </div>
-
-        <div className="flex items-center gap-2 self-start md:self-auto">
-          <span className="inline-flex items-center gap-2 text-xs font-medium text-stone-600 bg-white border border-stone-200/80 rounded-xl px-3.5 py-2 shadow-xs">
-            <span
-              className={`w-2 h-2 rounded-full ${
-                pendingLeaves.length > 0
-                  ? 'bg-amber-500 animate-pulse'
-                  : 'bg-emerald-500'
-              }`}
-            />
-            <span>
-              {pendingLeaves.length === 1
-                ? '1 Request Pending'
-                : `${pendingLeaves.length} Requests Pending`}
-            </span>
-          </span>
-        </div>
       </header>
 
       {/* KPI Overview Cards matching Dashboard */}
@@ -214,8 +200,9 @@ export const NonEmployeeLeaveSection: React.FC = () => {
               Leave Requests Directory
             </h2>
             <p className="text-xs sm:text-sm text-stone-600 mt-1 max-w-2xl">
-              Review, approve, and manage leave applications filed across academic
-              departments and administrative personnel. Click any row to view full details.
+              Review, approve, and manage leave applications filed across
+              academic departments and administrative personnel. Click any row
+              to view full details.
             </p>
           </div>
 
@@ -310,7 +297,10 @@ export const NonEmployeeLeaveSection: React.FC = () => {
                   <tr>
                     <td colSpan={5} className="text-center py-16">
                       <div className="flex flex-col items-center gap-3 text-green-900">
-                        <Loader2 size={26} className="animate-spin text-emerald-800" />
+                        <Loader2
+                          size={26}
+                          className="animate-spin text-emerald-800"
+                        />
                         <p className="text-xs font-medium text-stone-600">
                           Loading leave records...
                         </p>
@@ -354,7 +344,10 @@ export const NonEmployeeLeaveSection: React.FC = () => {
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-1.5 text-xs font-medium text-stone-700">
-                          <Clock size={13} className="text-emerald-800 shrink-0" />
+                          <Clock
+                            size={13}
+                            className="text-emerald-800 shrink-0"
+                          />
                           <span>
                             {l.startDate} to {l.endDate}
                           </span>
@@ -388,7 +381,10 @@ export const NonEmployeeLeaveSection: React.FC = () => {
                               <button
                                 type="button"
                                 onClick={() =>
-                                  setActionConfirm({ type: 'approve', record: l })
+                                  setActionConfirm({
+                                    type: 'approve',
+                                    record: l,
+                                  })
                                 }
                                 disabled={isMutating}
                                 aria-label={`Approve request for ${l.employeeName}`}
@@ -400,7 +396,10 @@ export const NonEmployeeLeaveSection: React.FC = () => {
                               <button
                                 type="button"
                                 onClick={() =>
-                                  setActionConfirm({ type: 'reject', record: l })
+                                  setActionConfirm({
+                                    type: 'reject',
+                                    record: l,
+                                  })
                                 }
                                 disabled={isMutating}
                                 aria-label={`Reject request for ${l.employeeName}`}
@@ -415,7 +414,10 @@ export const NonEmployeeLeaveSection: React.FC = () => {
                               <button
                                 type="button"
                                 onClick={() =>
-                                  setActionConfirm({ type: 'delete', record: l })
+                                  setActionConfirm({
+                                    type: 'delete',
+                                    record: l,
+                                  })
                                 }
                                 disabled={isMutating}
                                 aria-label={`Delete record for ${l.employeeName}`}
@@ -439,7 +441,10 @@ export const NonEmployeeLeaveSection: React.FC = () => {
                               <button
                                 type="button"
                                 onClick={() =>
-                                  setActionConfirm({ type: 'delete', record: l })
+                                  setActionConfirm({
+                                    type: 'delete',
+                                    record: l,
+                                  })
                                 }
                                 disabled={isMutating}
                                 aria-label={`Delete record for ${l.employeeName}`}
@@ -555,14 +560,18 @@ export const NonEmployeeLeaveSection: React.FC = () => {
               {/* Date & Time Range */}
               <div className="p-3.5 bg-stone-50 rounded-xl border border-stone-200/80 text-xs space-y-2">
                 <div className="flex justify-between">
-                  <span className="text-stone-500 font-medium">Date Range:</span>
+                  <span className="text-stone-500 font-medium">
+                    Date Range:
+                  </span>
                   <span className="font-bold text-green-950">
                     {selectedRecord.startDate} to {selectedRecord.endDate}
                   </span>
                 </div>
                 {(selectedRecord.timeFrom || selectedRecord.timeTo) && (
                   <div className="flex justify-between pt-1 border-t border-stone-200/60">
-                    <span className="text-stone-500 font-medium">Time Schedule:</span>
+                    <span className="text-stone-500 font-medium">
+                      Time Schedule:
+                    </span>
                     <span className="font-semibold text-stone-800">
                       {selectedRecord.timeFrom || '—'} to{' '}
                       {selectedRecord.timeTo || '—'}
@@ -673,7 +682,8 @@ export const NonEmployeeLeaveSection: React.FC = () => {
                   {actionConfirm.type === 'delete' && 'Delete Leave Record'}
                 </h3>
                 <p className="text-xs text-stone-500">
-                  {actionConfirm.record.employeeName} ({actionConfirm.record.type})
+                  {actionConfirm.record.employeeName} (
+                  {actionConfirm.record.type})
                 </p>
               </div>
             </div>

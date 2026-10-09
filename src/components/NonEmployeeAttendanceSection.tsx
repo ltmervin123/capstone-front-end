@@ -44,56 +44,53 @@ export const NonEmployeeAttendanceSection: React.FC = () => {
   const [filterStatus, setFilterStatus] = useState<string>('All');
   const [showAddModal, setShowAddModal] = useState(false);
 
-  const badgeText = currentUser?.role === Role.ADMIN ? 'Admin Office' : 'HR Office';
+  const badgeText =
+    currentUser?.role === Role.ADMIN ? 'Admin Office' : 'HR Office';
 
-  const {
-    presentCount,
-    lateCount,
-    absentOrLeaveCount,
-    filteredAttendance,
-  } = useMemo(() => {
-    let present = 0;
-    let late = 0;
-    let absentOrLeave = 0;
+  const { presentCount, lateCount, absentOrLeaveCount, filteredAttendance } =
+    useMemo(() => {
+      let present = 0;
+      let late = 0;
+      let absentOrLeave = 0;
 
-    for (const record of attendance) {
-      if (record.status === AttendanceStatus.PRESENT) {
-        present++;
-      } else if (record.status === AttendanceStatus.LATE) {
-        late++;
-      } else if (
-        record.status === AttendanceStatus.ABSENT ||
-        record.status === AttendanceStatus.ON_LEAVE
-      ) {
-        absentOrLeave++;
+      for (const record of attendance) {
+        if (record.status === AttendanceStatus.PRESENT) {
+          present++;
+        } else if (record.status === AttendanceStatus.LATE) {
+          late++;
+        } else if (
+          record.status === AttendanceStatus.ABSENT ||
+          record.status === AttendanceStatus.ON_LEAVE
+        ) {
+          absentOrLeave++;
+        }
       }
-    }
 
-    const normalizedSearch = searchTerm.trim().toLowerCase();
-    const filtered = attendance.filter((record: AttendanceRecord) => {
-      const matchesSearch =
-        !normalizedSearch ||
-        record.employeeName.toLowerCase().includes(normalizedSearch) ||
-        record.employeeId.toLowerCase().includes(normalizedSearch);
+      const normalizedSearch = searchTerm.trim().toLowerCase();
+      const filtered = attendance.filter((record: AttendanceRecord) => {
+        const matchesSearch =
+          !normalizedSearch ||
+          record.employeeName.toLowerCase().includes(normalizedSearch) ||
+          record.employeeId.toLowerCase().includes(normalizedSearch);
 
-      const matchesFilter =
-        filterStatus === 'All'
-          ? true
-          : filterStatus === 'ABSENT_OR_LEAVE'
-            ? record.status === AttendanceStatus.ABSENT ||
-              record.status === AttendanceStatus.ON_LEAVE
-            : record.status === filterStatus;
+        const matchesFilter =
+          filterStatus === 'All'
+            ? true
+            : filterStatus === 'ABSENT_OR_LEAVE'
+              ? record.status === AttendanceStatus.ABSENT ||
+                record.status === AttendanceStatus.ON_LEAVE
+              : record.status === filterStatus;
 
-      return matchesSearch && matchesFilter;
-    });
+        return matchesSearch && matchesFilter;
+      });
 
-    return {
-      presentCount: present,
-      lateCount: late,
-      absentOrLeaveCount: absentOrLeave,
-      filteredAttendance: filtered,
-    };
-  }, [attendance, searchTerm, filterStatus]);
+      return {
+        presentCount: present,
+        lateCount: late,
+        absentOrLeaveCount: absentOrLeave,
+        filteredAttendance: filtered,
+      };
+    }, [attendance, searchTerm, filterStatus]);
 
   const statCards = [
     {
@@ -133,8 +130,14 @@ export const NonEmployeeAttendanceSection: React.FC = () => {
         { header: 'Employee ID', accessor: 'employeeId' },
         { header: 'Employee Name', accessor: 'employeeName' },
         { header: 'Date', accessor: 'date' },
-        { header: 'Time In', accessor: (row) => formatAttendanceTime(row.timeIn) },
-        { header: 'Time Out', accessor: (row) => formatAttendanceTime(row.timeOut) },
+        {
+          header: 'Time In',
+          accessor: (row) => formatAttendanceTime(row.timeIn),
+        },
+        {
+          header: 'Time Out',
+          accessor: (row) => formatAttendanceTime(row.timeOut),
+        },
         { header: 'Status', accessor: 'status' },
         { header: 'Remarks', accessor: (row) => row.remarks || '--' },
       ],
@@ -168,11 +171,6 @@ export const NonEmployeeAttendanceSection: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-3 self-start md:self-auto">
-          <span className="inline-flex items-center gap-2 text-xs font-medium text-stone-600 bg-white border border-stone-200/80 rounded-xl px-3.5 py-2 shadow-xs">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span>Live Attendance Roster</span>
-          </span>
-
           <button
             type="button"
             onClick={() => setShowAddModal(true)}
@@ -189,7 +187,8 @@ export const NonEmployeeAttendanceSection: React.FC = () => {
         <div className="flex items-start gap-3 p-4 bg-red-50 rounded-2xl border border-red-200 text-red-800 text-xs shadow-xs">
           <AlertCircle size={18} className="shrink-0 text-red-600 mt-0.5" />
           <div className="flex-1">
-            <span className="font-bold">Could not load attendance:</span> {listError}
+            <span className="font-bold">Could not load attendance:</span>{' '}
+            {listError}
           </div>
           <button
             type="button"
@@ -237,7 +236,8 @@ export const NonEmployeeAttendanceSection: React.FC = () => {
               Daily Attendance Roster
             </h2>
             <p className="text-xs sm:text-sm text-stone-600 mt-0.5">
-              Review staff clock-in/out logs, biometric timestamps, and attendance status.
+              Review staff clock-in/out logs, biometric timestamps, and
+              attendance status.
             </p>
           </div>
 
@@ -296,22 +296,40 @@ export const NonEmployeeAttendanceSection: React.FC = () => {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-stone-50 border-b border-stone-200/80 text-stone-600">
-                <th scope="col" className="px-6 py-3.5 text-xs font-bold text-stone-700 tracking-wide">
+                <th
+                  scope="col"
+                  className="px-6 py-3.5 text-xs font-bold text-stone-700 tracking-wide"
+                >
                   Employee
                 </th>
-                <th scope="col" className="px-6 py-3.5 text-xs font-bold text-stone-700 tracking-wide">
+                <th
+                  scope="col"
+                  className="px-6 py-3.5 text-xs font-bold text-stone-700 tracking-wide"
+                >
                   Date
                 </th>
-                <th scope="col" className="px-6 py-3.5 text-xs font-bold text-stone-700 tracking-wide">
+                <th
+                  scope="col"
+                  className="px-6 py-3.5 text-xs font-bold text-stone-700 tracking-wide"
+                >
                   Time In
                 </th>
-                <th scope="col" className="px-6 py-3.5 text-xs font-bold text-stone-700 tracking-wide">
+                <th
+                  scope="col"
+                  className="px-6 py-3.5 text-xs font-bold text-stone-700 tracking-wide"
+                >
                   Time Out
                 </th>
-                <th scope="col" className="px-6 py-3.5 text-xs font-bold text-stone-700 tracking-wide">
+                <th
+                  scope="col"
+                  className="px-6 py-3.5 text-xs font-bold text-stone-700 tracking-wide"
+                >
                   Status
                 </th>
-                <th scope="col" className="px-6 py-3.5 text-xs font-bold text-stone-700 tracking-wide">
+                <th
+                  scope="col"
+                  className="px-6 py-3.5 text-xs font-bold text-stone-700 tracking-wide"
+                >
                   Remarks
                 </th>
               </tr>
@@ -321,7 +339,10 @@ export const NonEmployeeAttendanceSection: React.FC = () => {
                 <tr>
                   <td colSpan={6} className="px-6 py-16 text-center">
                     <div className="flex flex-col items-center justify-center gap-3 text-stone-600">
-                      <Loader2 size={28} className="animate-spin text-green-800" />
+                      <Loader2
+                        size={28}
+                        className="animate-spin text-green-800"
+                      />
                       <p className="font-semibold text-xs text-stone-600">
                         Loading attendance records...
                       </p>
@@ -331,7 +352,10 @@ export const NonEmployeeAttendanceSection: React.FC = () => {
               )}
               {!listLoading &&
                 filteredAttendance.map((record) => (
-                  <tr key={record.id} className="hover:bg-stone-50/70 transition-colors group">
+                  <tr
+                    key={record.id}
+                    className="hover:bg-stone-50/70 transition-colors group"
+                  >
                     <td className="px-6 py-4">
                       <div>
                         <p className="font-bold text-green-950 text-sm leading-tight">
@@ -376,8 +400,14 @@ export const NonEmployeeAttendanceSection: React.FC = () => {
                 ))}
               {!listLoading && filteredAttendance.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-6 py-16 text-center text-stone-400">
-                    <Calendar size={40} className="mx-auto mb-3 text-stone-300 stroke-1" />
+                  <td
+                    colSpan={6}
+                    className="px-6 py-16 text-center text-stone-400"
+                  >
+                    <Calendar
+                      size={40}
+                      className="mx-auto mb-3 text-stone-300 stroke-1"
+                    />
                     <p className="font-bold text-stone-700 text-sm">
                       No attendance records found
                     </p>
@@ -394,8 +424,15 @@ export const NonEmployeeAttendanceSection: React.FC = () => {
         {/* Table summary & reset */}
         <div className="flex flex-col sm:flex-row items-center justify-between text-xs text-stone-600 pt-1 gap-2">
           <span>
-            Showing <strong className="text-green-950 font-bold">{filteredAttendance.length}</strong> of{' '}
-            <strong className="text-green-950 font-bold">{attendance.length}</strong> total records
+            Showing{' '}
+            <strong className="text-green-950 font-bold">
+              {filteredAttendance.length}
+            </strong>{' '}
+            of{' '}
+            <strong className="text-green-950 font-bold">
+              {attendance.length}
+            </strong>{' '}
+            total records
           </span>
           {(filterStatus !== 'All' || searchTerm.trim() !== '') && (
             <button

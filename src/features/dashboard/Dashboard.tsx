@@ -104,20 +104,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveView }) => {
     color: EDUCATION_COLORS[edu.level] || 'bg-stone-400',
   }));
   const recruitmentStats = summary.recruitment;
-  const generatedDate = new Date(summary.generatedAt);
-  const datePart = generatedDate.toLocaleDateString('en-PH', {
-    timeZone: 'Asia/Manila',
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  });
-  const timePart = generatedDate.toLocaleTimeString('en-PH', {
-    timeZone: 'Asia/Manila',
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true,
-  });
-  const generatedAt = `${datePart} at ${timePart}`;
 
   const statCards = [
     {
@@ -181,13 +167,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveView }) => {
               </div>
             </div>
           </div>
-        </div>
-
-        <div className="flex items-center gap-2 self-start md:self-auto">
-          <span className="inline-flex items-center gap-2 text-xs font-medium text-stone-600 bg-white border border-stone-200/80 rounded-xl px-3.5 py-2 shadow-xs">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span>Updated {generatedAt}</span>
-          </span>
         </div>
       </header>
 
