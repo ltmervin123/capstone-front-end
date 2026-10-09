@@ -20,7 +20,6 @@ export function useAiConversationsQuery(options?: { enabled?: boolean }) {
     queryKey: AI_CONVERSATIONS_QUERY_KEY,
     queryFn: () => aiService.listConversations(),
     enabled: options?.enabled ?? true,
-    staleTime: 1000 * 60 * 2, // 2 minutes
   });
 }
 
@@ -40,7 +39,6 @@ export function useAiConversationQuery(
       return aiService.getConversation(conversationId);
     },
     enabled: !!conversationId && (options?.enabled ?? true),
-    staleTime: 1000 * 60 * 5, // 5 minutes
   });
 }
 
@@ -65,7 +63,9 @@ export function useRenameAiConversation() {
         aiConversationQueryKey(updated.id),
         (current) => (current ? { ...current, title: updated.title } : current)
       );
-      void queryClient.invalidateQueries({ queryKey: AI_CONVERSATIONS_QUERY_KEY });
+      void queryClient.invalidateQueries({
+        queryKey: AI_CONVERSATIONS_QUERY_KEY,
+      });
     },
   });
 }
@@ -83,8 +83,12 @@ export function useDeleteAiConversation() {
         AI_CONVERSATIONS_QUERY_KEY,
         (current) => current?.filter((conv) => conv.id !== deletedId)
       );
-      queryClient.removeQueries({ queryKey: aiConversationQueryKey(deletedId) });
-      void queryClient.invalidateQueries({ queryKey: AI_CONVERSATIONS_QUERY_KEY });
+      queryClient.removeQueries({
+        queryKey: aiConversationQueryKey(deletedId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: AI_CONVERSATIONS_QUERY_KEY,
+      });
     },
   });
 }
@@ -98,9 +102,14 @@ export function useClearAllAiConversations() {
   return useMutation({
     mutationFn: () => aiService.clearAllConversations(),
     onSuccess: () => {
-      queryClient.setQueryData<ConversationSummary[]>(AI_CONVERSATIONS_QUERY_KEY, []);
+      queryClient.setQueryData<ConversationSummary[]>(
+        AI_CONVERSATIONS_QUERY_KEY,
+        []
+      );
       queryClient.removeQueries({ queryKey: ['ai'] });
-      void queryClient.invalidateQueries({ queryKey: AI_CONVERSATIONS_QUERY_KEY });
+      void queryClient.invalidateQueries({
+        queryKey: AI_CONVERSATIONS_QUERY_KEY,
+      });
     },
   });
 }
@@ -119,9 +128,17 @@ export function useStreamAiChat() {
       conversationId,
       signal,
     }: StreamChatPayload) =>
-      aiService.streamAiChat(message, history, callbacks, conversationId, signal),
+      aiService.streamAiChat(
+        message,
+        history,
+        callbacks,
+        conversationId,
+        signal
+      ),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: AI_CONVERSATIONS_QUERY_KEY });
+      void queryClient.invalidateQueries({
+        queryKey: AI_CONVERSATIONS_QUERY_KEY,
+      });
     },
   });
 }

@@ -7,15 +7,18 @@ import App from './App.tsx';
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      refetchOnWindowFocus: false,
+      refetchOnWindowFocus: true, // Refetch data when window regains focus
+      staleTime: 1000 * 60 * 1, // 1 minute: data is considered fresh; no refetch on page remount
+      gcTime: 1000 * 60 * 5, // Keep unused data in cache for 5 minutes
     },
   },
 });
+      <App />
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
       <App />
     </QueryClientProvider>
-  </StrictMode>,
+  </StrictMode>
 );
