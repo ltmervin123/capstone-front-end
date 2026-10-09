@@ -17,17 +17,17 @@ export function leaveDays(leave: LeaveRecord): number {
 export function leaveTypeBadgeClass(type: LeaveType): string {
   switch (type) {
     case LeaveType.LEAVE_CREDITS:
-      return 'bg-green-50 text-green-850';
+      return 'bg-emerald-50 text-emerald-800 border border-emerald-200/60';
     case LeaveType.MATERNITY:
     case LeaveType.VAWC:
-      return 'bg-rose-50 text-rose-850';
+      return 'bg-rose-50 text-rose-800 border border-rose-200/60';
     case LeaveType.PATERNITY:
     case LeaveType.SOLO_PARENT:
-      return 'bg-blue-50 text-blue-850';
+      return 'bg-blue-50 text-blue-800 border border-blue-200/60';
     case LeaveType.STUDY:
     case LeaveType.SPECIAL:
-      return 'bg-purple-50 text-purple-850';
+      return 'bg-purple-50 text-purple-800 border border-purple-200/60';
     default:
-      return 'bg-amber-50 text-amber-850';
+      return 'bg-amber-50 text-amber-800 border border-amber-200/60';
   }
 }
