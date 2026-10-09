@@ -1,7 +1,25 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { MessageSquare, Send, X, AlertCircle, CheckCircle2, ShieldAlert, MessageCircle, Clock, Bell } from 'lucide-react';
-import { useCreateFeedback, useFeedbackQuery, useMarkFeedbackNotificationsRead } from '../../hooks/useFeedback';
-import { createFeedbackFormSchema, FEEDBACK_CATEGORIES } from '../../schemas/feedback.schema';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  MessageSquare,
+  Send,
+  X,
+  AlertCircle,
+  CheckCircle2,
+  ShieldAlert,
+  MessageCircle,
+  Clock,
+  Bell,
+  Loader2,
+} from 'lucide-react';
+import {
+  useCreateFeedback,
+  useFeedbackQuery,
+  useMarkFeedbackNotificationsRead,
+} from '../../hooks/useFeedback';
+import {
+  createFeedbackFormSchema,
+  FEEDBACK_CATEGORIES,
+} from '../../schemas/feedback.schema';
 import { ApiRequestError } from '../../utils/apiClient';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -10,21 +28,32 @@ interface FeedbackModalProps {
   onClose: () => void;
 }
 
-export const FeedbackModal: React.FC<FeedbackModalProps> = ({ isOpen, onClose }) => {
+export const FeedbackModal: React.FC<FeedbackModalProps> = ({
+  isOpen,
+  onClose,
+}) => {
   const [activeTab, setActiveTab] = useState<'submit' | 'history'>('submit');
-  const [category, setCategory] = useState<(typeof FEEDBACK_CATEGORIES)[number]>('General Feedback / Suggestion');
+  const [category, setCategory] =
+    useState<(typeof FEEDBACK_CATEGORIES)[number]>(
+      'General Feedback / Suggestion'
+    );
   const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');
   const [isAnonymous, setIsAnonymous] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const feedbackQuery = useFeedbackQuery({ enabled: isOpen, refetchInterval: isOpen ? 10000 : false });
+  const feedbackQuery = useFeedbackQuery({
+    enabled: isOpen,
+    refetchInterval: isOpen ? 10000 : false,
+  });
   const createFeedback = useCreateFeedback();
   const markNotificationsRead = useMarkFeedbackNotificationsRead();
   const myFeedbacks = feedbackQuery.data ?? [];
   const submitting = createFeedback.isPending;
-  const unreadCount = myFeedbacks.filter((item) => item.hasUnreadNotification).length;
+  const unreadCount = myFeedbacks.filter(
+    (item) => item.hasUnreadNotification
+  ).length;
   const viewedHistoryRef = useRef(false);
 
   useEffect(() => {
@@ -40,7 +69,31 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({ isOpen, onClose })
     }
   }, [isOpen, markNotificationsRead]);
 
-  if (!isOpen) return null;
+  const handleClose = useCallback(() => {
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    onClose();
+  }, [onClose]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = originalOverflow;
+    };
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        handleClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, handleClose]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -55,13 +108,17 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({ isOpen, onClose })
     });
 
     if (!parsed.success) {
-      setErrorMessage(parsed.error.issues[0]?.message ?? 'Please complete the feedback form.');
+      setErrorMessage(
+        parsed.error.issues[0]?.message ?? 'Please complete the feedback form.'
+      );
       return;
     }
 
     createFeedback.mutate(parsed.data, {
       onSuccess: () => {
-        setSuccessMessage('Thank you! Your feedback has been sent directly to HR and Admin.');
+        setSuccessMessage(
+          'Thank you! Your feedback has been sent directly to HR and Admin.'
+        );
         setSubject('');
         setMessage('');
         setIsAnonymous(false);
@@ -84,251 +141,406 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({ isOpen, onClose })
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-        {/* Backdrop */}
-        <motion.div 
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          onClick={onClose}
-          className="absolute inset-0 bg-green-950/80 backdrop-blur-sm"
-        />
-
-        {/* Modal Window */}
-        <motion.div 
-          initial={{ opacity: 0, scale: 0.95, y: 20 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.95, y: 20 }}
-          className="relative w-full max-w-2xl bg-white rounded-[32px] shadow-2xl overflow-hidden border border-gray-100 flex flex-col max-h-[90vh]"
+      {isOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="feedback-modal-title"
+          onClick={handleClose}
+          className="fixed inset-0 bg-green-950/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 overflow-hidden"
         >
-          {/* Header */}
-          <div className="bg-green-900 px-6 py-5 text-white flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 bg-yellow-400 rounded-xl text-green-950 shadow-sm">
-                <MessageSquare size={20} />
+          <motion.div
+            initial={{ scale: 0.95, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.95, opacity: 0 }}
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-2xl w-full max-w-2xl border border-stone-200/80 shadow-2xl overflow-hidden flex flex-col h-[560px] sm:h-[620px] max-h-[calc(100vh-2rem)] relative"
+          >
+            {/* Header */}
+            <div className="p-6 border-b border-stone-200/80 flex items-start justify-between gap-4 shrink-0 bg-white">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-emerald-50 text-emerald-800 rounded-xl">
+                  <MessageSquare size={20} />
+                </div>
+                <div>
+                  <h3
+                    id="feedback-modal-title"
+                    className="font-bold text-lg text-green-950 tracking-tight"
+                  >
+                    Employee Feedback Box
+                  </h3>
+                  <p className="text-xs text-stone-600 font-medium mt-0.5">
+                    Northern Mindanao Colleges, Inc. • HR & Admin Communication
+                  </p>
+                </div>
               </div>
-              <div>
-                <h3 className="text-base font-black uppercase tracking-tight">Employee Feedback Box</h3>
-                <p className="text-[10px] text-green-200 uppercase tracking-widest font-bold">Share inquiries, ideas, or workplace feedback</p>
-              </div>
+
+              <button
+                type="button"
+                onClick={handleClose}
+                aria-label="Close dialog"
+                className="p-1.5 text-stone-400 hover:text-stone-700 hover:bg-stone-100 rounded-xl transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-green-800 focus-visible:outline-hidden"
+              >
+                <X size={18} />
+              </button>
             </div>
 
-            <button 
-              onClick={onClose}
-              className="p-2 text-green-200 hover:text-white hover:bg-green-800 rounded-lg transition-colors cursor-pointer"
-            >
-              <X size={20} />
-            </button>
-          </div>
-
-          {/* Sub-tab bar */}
-          <div className="flex border-b border-gray-100 bg-gray-50/50 px-6">
-            <button
-              onClick={() => setActiveTab('submit')}
-              className={`py-3 px-4 text-xs font-black uppercase tracking-wider transition-all relative cursor-pointer ${
-                activeTab === 'submit' ? 'text-green-900' : 'text-gray-400 hover:text-green-800'
-              }`}
-            >
-              Send Feedback
-              {activeTab === 'submit' && (
-                <div className="absolute bottom-0 left-0 right-0 h-1 bg-yellow-400" />
-              )}
-            </button>
-            <button
-              onClick={() => setActiveTab('history')}
-              className={`py-3 px-4 text-xs font-black uppercase tracking-wider transition-all relative cursor-pointer ${
-                activeTab === 'history' ? 'text-green-900' : 'text-gray-400 hover:text-green-800'
-              }`}
-            >
-              My Sent Messages ({myFeedbacks.length})
-              {unreadCount > 0 && (
-                <span className="ml-2 inline-flex items-center justify-center min-w-4 h-4 px-1 rounded-full bg-yellow-400 text-green-950 text-[9px] font-black">
-                  {unreadCount}
-                </span>
-              )}
-              {activeTab === 'history' && (
-                <div className="absolute bottom-0 left-0 right-0 h-1 bg-yellow-400" />
-              )}
-            </button>
-          </div>
-
-          {/* Content Body */}
-          <div className="p-6 overflow-y-auto space-y-4">
-            {activeTab === 'submit' ? (
-              <form onSubmit={handleSubmit} className="space-y-4">
-                {errorMessage && (
-                  <div className="p-3 bg-red-50 border border-red-100 rounded-xl flex items-center gap-2 text-xs text-red-800 font-medium">
-                    <AlertCircle size={16} className="shrink-0 text-red-600" />
-                    <span>{errorMessage}</span>
-                  </div>
-                )}
-
-                {successMessage && (
-                  <div className="p-3 bg-green-50 border border-green-100 rounded-xl flex items-center gap-2 text-xs text-green-800 font-bold">
-                    <CheckCircle2 size={16} className="shrink-0 text-green-600" />
-                    <span>{successMessage}</span>
-                  </div>
-                )}
-
-                {/* Category Dropdown */}
-                <div>
-                  <label className="block text-[11px] font-black uppercase tracking-wider text-green-900 mb-1.5">
-                    Feedback Category
-                  </label>
-                  <select
-                    value={category}
-                    onChange={(e) => setCategory(e.target.value as (typeof FEEDBACK_CATEGORIES)[number])}
-                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl font-medium text-xs text-green-950 focus:ring-2 focus:ring-yellow-400 focus:outline-none"
+            {/* Sub-navigation tabs */}
+            <div className="px-6 py-3 bg-stone-50/80 border-b border-stone-200/80 flex items-center justify-between gap-3 shrink-0">
+              <div
+                role="tablist"
+                aria-label="Feedback views"
+                className="flex items-center gap-1 bg-stone-200/70 p-1 rounded-xl"
+              >
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={activeTab === 'submit'}
+                  onClick={() => setActiveTab('submit')}
+                  className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer focus-visible:ring-2 focus-visible:ring-green-800 focus-visible:outline-hidden ${
+                    activeTab === 'submit'
+                      ? 'bg-white text-green-950 shadow-xs'
+                      : 'text-stone-600 hover:text-stone-900 hover:bg-stone-200/50'
+                  }`}
+                >
+                  Send Feedback
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={activeTab === 'history'}
+                  onClick={() => setActiveTab('history')}
+                  className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer focus-visible:ring-2 focus-visible:ring-green-800 focus-visible:outline-hidden ${
+                    activeTab === 'history'
+                      ? 'bg-white text-green-950 shadow-xs'
+                      : 'text-stone-600 hover:text-stone-900 hover:bg-stone-200/50'
+                  }`}
+                >
+                  <span>My Sent Messages</span>
+                  <span
+                    className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
+                      unreadCount > 0
+                        ? 'bg-amber-400 text-green-950'
+                        : 'bg-stone-300 text-stone-700'
+                    }`}
                   >
-                    <option value="General Feedback / Suggestion">💬 General Feedback / Suggestion</option>
-                    <option value="Leave Inquiry">📅 Leave Inquiry / Allowance Request</option>
-                    <option value="Payroll Inquiry">💵 Payroll / Compensation Inquiry</option>
-                    <option value="Workplace Suggestion">🏢 Workplace / Facilities Concern</option>
-                    <option value="Confidential HR Concern">🛡️ Confidential HR Concern</option>
-                  </select>
-                </div>
+                    {myFeedbacks.length}
+                  </span>
+                </button>
+              </div>
 
-                {/* Subject */}
-                <div>
-                  <label className="block text-[11px] font-black uppercase tracking-wider text-green-900 mb-1.5">
-                    Subject / Title
-                  </label>
-                  <input
-                    type="text"
-                    value={subject}
-                    onChange={(e) => setSubject(e.target.value)}
-                    placeholder="Brief title of your feedback or inquiry..."
-                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl font-medium text-xs text-green-950 focus:ring-2 focus:ring-yellow-400 focus:outline-none"
-                  />
-                </div>
+              {unreadCount > 0 && activeTab !== 'history' && (
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('history')}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-100 text-amber-900 border border-amber-200/60 text-[11px] font-bold hover:bg-amber-200/70 transition-colors cursor-pointer"
+                >
+                  <Bell size={12} className="text-amber-700" />
+                  <span>
+                    {unreadCount} new {unreadCount === 1 ? 'update' : 'updates'}
+                  </span>
+                </button>
+              )}
+            </div>
 
-                {/* Message */}
-                <div>
-                  <label className="block text-[11px] font-black uppercase tracking-wider text-green-900 mb-1.5">
-                    Message Details
-                  </label>
-                  <textarea
-                    rows={4}
-                    value={message}
-                    onChange={(e) => setMessage(e.target.value)}
-                    placeholder="Write your feedback, inquiry, or suggestion clearly here..."
-                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl font-medium text-xs text-green-950 focus:ring-2 focus:ring-yellow-400 focus:outline-none resize-none"
-                  />
-                </div>
-
-                {/* Sender Option */}
-                <div className="flex items-center justify-between p-3 bg-green-50/50 rounded-xl border border-green-100">
-                  <div className="flex items-center gap-2">
-                    <ShieldAlert size={16} className="text-green-800" />
-                    <div>
-                      <p className="text-xs font-bold text-green-900">Submit Anonymously</p>
-                      <p className="text-[10px] text-gray-500">Hide your name and email address from HR view</p>
+            {/* Modal Body */}
+            {activeTab === 'submit' ? (
+              <form
+                onSubmit={handleSubmit}
+                className="flex flex-col flex-1 min-h-0"
+              >
+                <div className="p-6 overflow-y-auto space-y-5 flex-1 min-h-0 max-h-[65vh]">
+                  {errorMessage && (
+                    <div
+                      role="alert"
+                      className="flex items-start gap-3 p-3.5 bg-red-50 rounded-xl border border-red-200 text-red-800 text-xs shadow-xs"
+                    >
+                      <AlertCircle
+                        size={16}
+                        className="shrink-0 text-red-600 mt-0.5"
+                      />
+                      <div>
+                        <span className="font-bold">Submission error:</span>{' '}
+                        {errorMessage}
+                      </div>
                     </div>
+                  )}
+
+                  {successMessage && (
+                    <div
+                      role="alert"
+                      className="flex items-start gap-3 p-3.5 bg-emerald-50 rounded-xl border border-emerald-200 text-emerald-800 text-xs shadow-xs"
+                    >
+                      <CheckCircle2
+                        size={16}
+                        className="shrink-0 text-emerald-600 mt-0.5"
+                      />
+                      <div>
+                        <span className="font-bold">Sent successfully:</span>{' '}
+                        {successMessage}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Category Dropdown */}
+                  <div>
+                    <label
+                      htmlFor="feedback-category-select"
+                      className="block text-xs font-bold text-stone-700 mb-1.5"
+                    >
+                      Feedback Category
+                    </label>
+                    <select
+                      id="feedback-category-select"
+                      value={category}
+                      onChange={(e) =>
+                        setCategory(
+                          e.target.value as (typeof FEEDBACK_CATEGORIES)[number]
+                        )
+                      }
+                      className="w-full px-3.5 py-2.5 bg-stone-50 border border-stone-200/80 rounded-xl text-xs sm:text-sm font-semibold text-green-950 focus:bg-white focus:border-green-800 focus:ring-1 focus:ring-green-800 outline-none transition-all cursor-pointer"
+                    >
+                      <option value="General Feedback / Suggestion">
+                        General Feedback / Suggestion
+                      </option>
+                      <option value="Leave Inquiry">
+                        Leave Inquiry / Allowance Request
+                      </option>
+                      <option value="Payroll Inquiry">
+                        Payroll / Compensation Inquiry
+                      </option>
+                      <option value="Workplace Suggestion">
+                        Workplace / Facilities Concern
+                      </option>
+                      <option value="Confidential HR Concern">
+                        Confidential HR Concern
+                      </option>
+                    </select>
                   </div>
-                  <input
-                    type="checkbox"
-                    checked={isAnonymous}
-                    onChange={(e) => setIsAnonymous(e.target.checked)}
-                    className="w-4 h-4 text-green-800 rounded border-gray-300 focus:ring-yellow-400 cursor-pointer"
-                  />
+
+                  {/* Subject */}
+                  <div>
+                    <label
+                      htmlFor="feedback-subject-input"
+                      className="block text-xs font-bold text-stone-700 mb-1.5"
+                    >
+                      Subject / Title
+                    </label>
+                    <input
+                      id="feedback-subject-input"
+                      type="text"
+                      required
+                      value={subject}
+                      onChange={(e) => setSubject(e.target.value)}
+                      placeholder="Brief summary of your feedback or inquiry..."
+                      className="w-full px-3.5 py-2.5 bg-stone-50 border border-stone-200/80 rounded-xl text-xs sm:text-sm font-semibold text-green-950 focus:bg-white focus:border-green-800 focus:ring-1 focus:ring-green-800 outline-none transition-all placeholder:text-stone-400"
+                    />
+                  </div>
+
+                  {/* Message */}
+                  <div>
+                    <label
+                      htmlFor="feedback-message-input"
+                      className="block text-xs font-bold text-stone-700 mb-1.5"
+                    >
+                      Message Details
+                    </label>
+                    <textarea
+                      id="feedback-message-input"
+                      rows={4}
+                      required
+                      value={message}
+                      onChange={(e) => setMessage(e.target.value)}
+                      placeholder="Provide details regarding your inquiry, idea, or concern..."
+                      className="w-full px-3.5 py-2.5 bg-stone-50 border border-stone-200/80 rounded-xl text-xs sm:text-sm font-semibold text-green-950 focus:bg-white focus:border-green-800 focus:ring-1 focus:ring-green-800 outline-none transition-all placeholder:text-stone-400 resize-none"
+                    />
+                  </div>
+
+                  {/* Anonymous Toggle Card */}
+                  <div className="flex items-center justify-between p-3.5 bg-stone-50 rounded-xl border border-stone-200/80">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-emerald-50 text-emerald-800 rounded-lg shrink-0">
+                        <ShieldAlert size={16} />
+                      </div>
+                      <div>
+                        <label
+                          htmlFor="feedback-anonymous-check"
+                          className="text-xs font-bold text-green-950 cursor-pointer block"
+                        >
+                          Submit Anonymously
+                        </label>
+                        <p className="text-[11px] text-stone-500 font-medium">
+                          Hide your name and email address from HR view
+                        </p>
+                      </div>
+                    </div>
+                    <input
+                      id="feedback-anonymous-check"
+                      type="checkbox"
+                      checked={isAnonymous}
+                      onChange={(e) => setIsAnonymous(e.target.checked)}
+                      className="w-4 h-4 text-green-800 rounded border-stone-300 focus:ring-green-800 cursor-pointer accent-green-900"
+                    />
+                  </div>
                 </div>
 
-                {/* Actions */}
-                <div className="pt-2 flex items-center justify-end gap-3">
+                {/* Footer */}
+                <div className="p-6 border-t border-stone-200/80 bg-stone-50/50 flex flex-col-reverse sm:flex-row gap-2.5 justify-end shrink-0 mt-auto">
                   <button
                     type="button"
-                    onClick={onClose}
-                    className="px-5 py-2.5 text-xs font-bold text-gray-600 hover:text-green-900 transition-colors cursor-pointer"
+                    onClick={handleClose}
+                    disabled={submitting}
+                    className="px-4 py-2.5 bg-white border border-stone-200/80 text-stone-700 font-bold text-xs uppercase tracking-wider rounded-xl hover:bg-stone-50 transition-colors cursor-pointer disabled:opacity-50"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
                     disabled={submitting}
-                    className="flex items-center gap-2 px-6 py-2.5 bg-green-900 text-yellow-400 font-black rounded-xl text-xs uppercase tracking-wider hover:bg-green-800 shadow-md transition-all cursor-pointer disabled:opacity-50"
+                    className="px-5 py-2.5 bg-green-900 hover:bg-green-800 text-amber-300 font-bold text-xs uppercase tracking-wider rounded-xl shadow-xs transition-colors cursor-pointer flex items-center justify-center gap-2 disabled:opacity-60"
                   >
-                    <Send size={14} />
-                    {submitting ? 'Submitting...' : 'Send Feedback'}
+                    {submitting ? (
+                      <>
+                        <Loader2 size={15} className="animate-spin" />
+                        <span>Submitting...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Send size={14} />
+                        <span>Send Feedback</span>
+                      </>
+                    )}
                   </button>
                 </div>
               </form>
             ) : (
-              <div className="space-y-3">
-                {feedbackQuery.isPending ? (
-                  <p className="py-12 text-center text-xs font-bold uppercase tracking-wider text-gray-400">
-                    Loading your messages...
-                  </p>
-                ) : feedbackQuery.error ? (
-                  <p className="py-12 text-center text-xs font-bold text-red-700">
-                    {feedbackQuery.error instanceof ApiRequestError
-                      ? feedbackQuery.error.message
-                      : 'Failed to load your sent messages.'}
-                  </p>
-                ) : myFeedbacks.length === 0 ? (
-                  <div className="py-12 text-center text-gray-400 space-y-2">
-                    <MessageCircle size={36} className="mx-auto opacity-30 text-green-900" />
-                    <p className="text-xs font-bold uppercase tracking-wider">No feedback sent yet</p>
-                    <p className="text-[11px]">Your sent messages and HR responses will appear here.</p>
-                  </div>
-                ) : (
-                  myFeedbacks.map((fb) => (
-                    <div
-                      key={fb.id}
-                      className={`p-4 bg-gray-50 rounded-2xl border space-y-2 ${
-                        fb.hasUnreadNotification ? 'border-yellow-400 ring-1 ring-yellow-300' : 'border-gray-150'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="px-2.5 py-0.5 bg-green-100 text-green-900 text-[10px] font-black uppercase rounded-full">
-                          {fb.category}
-                        </span>
-                        <div className="flex items-center gap-2">
-                          {fb.hasUnreadNotification ? (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-yellow-400 text-green-950 text-[9px] font-black uppercase rounded-full">
-                              <Bell size={10} />
-                              New update
-                            </span>
-                          ) : fb.employeeNotified ? (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-green-800 text-yellow-400 text-[9px] font-black uppercase rounded-full">
-                              <CheckCircle2 size={10} />
-                              Notified
-                            </span>
-                          ) : null}
-                          <span className={`px-2 py-0.5 text-[9px] font-black uppercase rounded-full ${
-                            fb.status === 'Resolved' ? 'bg-green-800 text-yellow-400' :
-                            fb.status === 'Under Review' ? 'bg-yellow-400 text-green-950' :
-                            'bg-blue-100 text-blue-900'
-                          }`}>
-                            {fb.status}
-                          </span>
-                          <span className="text-[10px] text-gray-400">
-                            {new Date(fb.createdAt).toLocaleDateString()}
-                          </span>
-                        </div>
-                      </div>
-                      <h4 className="font-black text-xs text-green-950">{fb.subject}</h4>
-                      <p className="text-xs text-gray-600 bg-white p-3 rounded-xl border border-gray-100 whitespace-pre-wrap leading-relaxed">
-                        {fb.message}
-                      </p>
-                      {fb.adminResponse && (
-                        <div className="p-3 bg-yellow-50 border border-yellow-200/60 rounded-xl space-y-1 mt-2">
-                          <div className="flex items-center gap-1.5 text-xs font-black text-green-900 uppercase">
-                            <Clock size={12} className="text-yellow-600" />
-                            <span>HR / Admin Response:</span>
-                          </div>
-                          <p className="text-xs text-green-950 font-medium leading-relaxed">
-                            {fb.adminResponse}
-                          </p>
-                        </div>
-                      )}
+              <div className="flex flex-col flex-1 min-h-0">
+                <div className="p-6 overflow-y-auto space-y-3 flex-1 min-h-0 max-h-[65vh] flex flex-col">
+                  {feedbackQuery.isPending ? (
+                    <div className="my-auto py-12 flex flex-col items-center justify-center gap-2 text-stone-500">
+                      <Loader2 size={24} className="animate-spin text-green-800" />
+                      <span className="text-xs font-semibold">
+                        Loading your messages...
+                      </span>
                     </div>
-                  ))
-                )}
+                  ) : feedbackQuery.error ? (
+                    <div
+                      role="alert"
+                      className="my-auto p-4 bg-red-50 rounded-xl border border-red-200 text-red-800 text-xs font-semibold text-center"
+                    >
+                      {feedbackQuery.error instanceof ApiRequestError
+                        ? feedbackQuery.error.message
+                        : 'Failed to load your sent messages.'}
+                    </div>
+                  ) : myFeedbacks.length === 0 ? (
+                    <div className="my-auto py-12 px-4 text-center rounded-xl border border-dashed border-stone-200 bg-stone-50/50 space-y-2">
+                      <MessageCircle
+                        size={32}
+                        className="mx-auto text-stone-400"
+                      />
+                      <p className="text-xs font-bold text-stone-700 uppercase tracking-wider">
+                        No feedback sent yet
+                      </p>
+                      <p className="text-xs text-stone-500 max-w-sm mx-auto">
+                        Your sent messages and official HR responses will appear
+                        here.
+                      </p>
+                    </div>
+                  ) : (
+                    myFeedbacks.map((fb) => (
+                      <div
+                        key={fb.id}
+                        className={`p-4 bg-white rounded-xl border space-y-3 transition-all ${
+                          fb.hasUnreadNotification
+                            ? 'border-amber-400 ring-1 ring-amber-300 shadow-xs'
+                            : 'border-stone-200/80 shadow-2xs hover:border-stone-300'
+                        }`}
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <span className="px-2.5 py-0.5 bg-emerald-50 text-emerald-800 border border-emerald-200/60 text-[10px] font-bold rounded-full">
+                            {fb.category}
+                          </span>
+                          <div className="flex flex-wrap items-center gap-2">
+                            {fb.hasUnreadNotification ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-400 text-green-950 text-[10px] font-black uppercase rounded-full shadow-2xs">
+                                <Bell size={10} />
+                                New update
+                              </span>
+                            ) : fb.employeeNotified ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-green-800 text-amber-300 text-[10px] font-bold uppercase rounded-full">
+                                <CheckCircle2 size={10} />
+                                Notified
+                              </span>
+                            ) : null}
+                            <span
+                              className={`px-2 py-0.5 text-[10px] font-bold rounded-full ${
+                                fb.status === 'Resolved'
+                                  ? 'bg-emerald-50 text-emerald-800 border border-emerald-200/60'
+                                  : fb.status === 'Under Review'
+                                    ? 'bg-amber-50 text-amber-900 border border-amber-200/60'
+                                    : 'bg-blue-50 text-blue-800 border border-blue-200/60'
+                              }`}
+                            >
+                              {fb.status}
+                            </span>
+                            <span className="text-[11px] text-stone-400 font-medium tabular-nums">
+                              {new Date(fb.createdAt).toLocaleDateString(
+                                'en-PH',
+                                {
+                                  timeZone: 'Asia/Manila',
+                                  month: 'short',
+                                  day: 'numeric',
+                                  year: 'numeric',
+                                }
+                              )}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div>
+                          <h4 className="font-bold text-xs sm:text-sm text-green-950">
+                            {fb.subject}
+                          </h4>
+                          <div className="mt-1.5 text-xs text-stone-700 bg-stone-50/70 p-3 rounded-xl border border-stone-200/60 whitespace-pre-wrap leading-relaxed">
+                            {fb.message}
+                          </div>
+                        </div>
+
+                        {fb.adminResponse && (
+                          <div className="p-3.5 bg-amber-50/70 border border-amber-200/60 rounded-xl space-y-1">
+                            <div className="flex items-center gap-1.5 text-xs font-bold text-amber-950">
+                              <Clock size={12} className="text-amber-700" />
+                              <span>HR / Admin Response</span>
+                            </div>
+                            <p className="text-xs text-stone-800 font-medium leading-relaxed pl-4">
+                              {fb.adminResponse}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                {/* History Footer */}
+                <div className="p-6 border-t border-stone-200/80 bg-stone-50/50 flex items-center justify-between shrink-0 mt-auto">
+                  <span className="text-xs text-stone-500 font-medium">
+                    {myFeedbacks.length}{' '}
+                    {myFeedbacks.length === 1 ? 'message' : 'messages'} recorded
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleClose}
+                    className="px-4 py-2.5 bg-white border border-stone-200/80 text-stone-700 font-bold text-xs uppercase tracking-wider rounded-xl hover:bg-stone-50 transition-colors cursor-pointer"
+                  >
+                    Close
+                  </button>
+                </div>
               </div>
             )}
-          </div>
-        </motion.div>
-      </div>
+          </motion.div>
+        </div>
+      )}
     </AnimatePresence>
   );
 };
