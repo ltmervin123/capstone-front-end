@@ -32,6 +32,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
   const user = useAuthStore((state) => state.user);
   const logoutMutation = useLogout();
   const mobileToggleRef = useRef<HTMLButtonElement>(null);
+  const [avatarFailed, setAvatarFailed] = useState(false);
 
   // Memoize route calculation
   const menuItems = useMemo(() => {
@@ -54,6 +55,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
       }
     });
   }, [location.pathname, menuItems]);
+
+  useEffect(() => {
+    setAvatarFailed(false);
+  }, [user?.id, user?.profilePicture]);
 
   // Handle mobile drawer keyboard accessibility & scroll lock
   useEffect(() => {
@@ -300,12 +305,21 @@ export const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
         <div className="p-4 border-t border-emerald-900/50 bg-[#081a0f] shrink-0 space-y-3">
           {/* User Profile Summary */}
           <div className="flex items-center gap-3 p-2.5 bg-emerald-950/90 border border-emerald-900/50 rounded-xl">
-            <div 
-              className="w-10 h-10 rounded-full bg-amber-400 text-emerald-950 font-black flex items-center justify-center text-base shrink-0 shadow-xs"
-              aria-hidden="true"
-            >
-              {user.username.charAt(0).toUpperCase()}
-            </div>
+            {user.role === Role.EMPLOYEE && user.profilePicture && !avatarFailed ? (
+              <img
+                src={user.profilePicture}
+                alt=""
+                className="w-10 h-10 rounded-full object-cover shrink-0 shadow-xs"
+                onError={() => setAvatarFailed(true)}
+              />
+            ) : (
+              <div
+                className="w-10 h-10 rounded-full bg-amber-400 text-emerald-950 font-black flex items-center justify-center text-base shrink-0 shadow-xs"
+                aria-hidden="true"
+              >
+                {user.username.charAt(0).toUpperCase()}
+              </div>
+            )}
             <div className="flex-1 min-w-0">
               <p className="text-sm font-bold text-white truncate" title={user.username}>
                 {user.username}
