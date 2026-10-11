@@ -37,9 +37,7 @@ export const ROUTE_MANIFEST: RouteItem[] = [
     path: '/dashboard',
     label: 'Dashboard',
     icon: LayoutDashboard,
-    roles: [Role.ADMIN, Role.HR],
     permissionKey: 'dashboard',
-    showInSidebar: (user: User) => user.role !== Role.EMPLOYEE,
   },
   {
     id: 'administration',
@@ -54,7 +52,6 @@ export const ROUTE_MANIFEST: RouteItem[] = [
     path: '/employees',
     label: 'Employee Manager',
     icon: Users,
-    roles: [Role.ADMIN, Role.HR],
     permissionKey: 'employees',
   },
   {
@@ -83,7 +80,6 @@ export const ROUTE_MANIFEST: RouteItem[] = [
     path: '/talent-acquisition',
     label: 'Talent Acquisition',
     icon: UserPlus,
-    roles: [Role.ADMIN, Role.HR],
     permissionKey: 'talentAcquisition',
   },
   {
@@ -91,17 +87,13 @@ export const ROUTE_MANIFEST: RouteItem[] = [
     path: '/feedback',
     label: 'Feedback Inbox',
     icon: MessageSquare,
-    roles: [Role.ADMIN, Role.HR],
     permissionKey: 'feedback',
-    showInSidebar: (user: User) =>
-      !user.employeeId && user.role !== Role.EMPLOYEE,
   },
   {
     id: 'ai-chat',
     path: '/ai-chat',
     label: 'AI Chat',
     icon: Bot,
-    roles: [Role.ADMIN, Role.HR],
     permissionKey: 'aiSearch',
   },
   {
@@ -109,7 +101,6 @@ export const ROUTE_MANIFEST: RouteItem[] = [
     path: '/reports',
     label: 'Reports',
     icon: BarChart3,
-    roles: [Role.ADMIN, Role.HR],
     permissionKey: 'reports',
   },
 ];

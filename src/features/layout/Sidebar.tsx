@@ -32,7 +32,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
   const user = useAuthStore((state) => state.user);
   const logoutMutation = useLogout();
   const mobileToggleRef = useRef<HTMLButtonElement>(null);
-  const [avatarFailed, setAvatarFailed] = useState(false);
+  const [failedAvatarKey, setFailedAvatarKey] = useState<string | null>(null);
+  const avatarKey = `${user?.id ?? ''}_${user?.profilePicture ?? ''}`;
+  const avatarFailed = failedAvatarKey === avatarKey;
 
   // Memoize route calculation
   const menuItems = useMemo(() => {
@@ -55,10 +57,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
       }
     });
   }, [location.pathname, menuItems]);
-
-  useEffect(() => {
-    setAvatarFailed(false);
-  }, [user?.id, user?.profilePicture]);
 
   // Handle mobile drawer keyboard accessibility & scroll lock
   useEffect(() => {
@@ -310,7 +308,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
                 src={user.profilePicture}
                 alt=""
                 className="w-10 h-10 rounded-full object-cover shrink-0 shadow-xs"
-                onError={() => setAvatarFailed(true)}
+                onError={() => setFailedAvatarKey(avatarKey)}
               />
             ) : (
               <div
