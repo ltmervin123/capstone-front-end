@@ -147,4 +147,43 @@ export const employeeService = {
 
     return response.data;
   },
+
+  async extractEmployeeDocument(file: File): Promise<ExtractedEmployeeDocumentData> {
+    const formData = new FormData();
+    formData.append('document', file);
+
+    const response = await apiRequest<ApiSuccessResponse<ExtractedEmployeeDocumentData>>(
+      '/employees/extract-document',
+      {
+        method: 'POST',
+        body: formData,
+      }
+    );
+
+    return response.data;
+  },
 };
+
+export interface ExtractedEmployeeDocumentData {
+  surname: string;
+  firstName: string;
+  middleName: string;
+  dateOfBirth: string;
+  sex: 'Male' | 'Female' | 'Other';
+  maritalStatus: string;
+  religion: string;
+  homeAddress: string;
+  contactNumber: string;
+  email: string;
+  position: string;
+  department: string;
+  employmentDate: string;
+  serviceDuration: string;
+  educationLevel: string;
+  bachelorsDegree: string;
+  mastersStatus: string;
+  mastersDegreeName: string;
+  doctorateStatus: string;
+  documentType: 'PDS' | 'RESUME' | 'CV' | 'BIODATA';
+  fileName: string;
+}

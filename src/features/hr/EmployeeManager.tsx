@@ -15,19 +15,30 @@ import {
   Download,
   Upload,
   AlertCircle,
+  AlertTriangle,
   ArrowRight,
   Loader2,
   Fingerprint,
   RefreshCw,
+  CheckCircle2,
+  Info,
 } from 'lucide-react';
 import { EmployeeForm } from './EmployeeForm';
 import { type Employee, DEPARTMENTS, Role } from '../../types/types';
 import { storageService } from '../../services/storageService';
+import { employeeService } from '../../services/employeeService';
 import { ApiRequestError } from '../../utils/apiClient';
 import { useEmployeesQuery, useDeleteEmployee } from '../../hooks/useEmployees';
 import { useCurrentUser } from '../../hooks/useAuth';
 import { Logo } from '../../assets/common/Logo.tsx';
 import { motion, AnimatePresence } from 'motion/react';
+
+interface ToastMessage {
+  id: string;
+  type: 'success' | 'error' | 'info';
+  title: string;
+  message: string;
+}
 
 export const EmployeeManager: React.FC = () => {
   const currentUser = useCurrentUser();
@@ -36,6 +47,10 @@ export const EmployeeManager: React.FC = () => {
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(
     null
   );
+  const [initialDocumentFile, setInitialDocumentFile] = useState<{
+    file: File;
+    documentType: 'PDS' | 'RESUME' | 'CV' | 'BIODATA';
+  } | null>(null);
   const [formTitle, setFormTitle] = useState<string | undefined>(undefined);
   const [formReadOnly, setFormReadOnly] = useState(false);
   const [activeTab, setActiveTab] = useState<'directory' | 'logs'>('directory');
@@ -46,6 +61,25 @@ export const EmployeeManager: React.FC = () => {
   const [parseError, setParseError] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRefForPds = useRef<HTMLInputElement>(null);
+
+  // Toast & Delete modal state
+  const [toasts, setToasts] = useState<ToastMessage[]>([]);
+  const [employeeToDelete, setEmployeeToDelete] = useState<Employee | null>(
+    null
+  );
+
+  const showToast = (toast: Omit<ToastMessage, 'id'>) => {
+    const id = Math.random().toString(36).substring(2, 9);
+    const newToast: ToastMessage = { ...toast, id };
+    setToasts((prev) => [...prev, newToast]);
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((t) => t.id !== id));
+    }, 5000);
+  };
+
+  const removeToast = (id: string) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  };
 
   // Directory state (API-backed via TanStack Query)
   const employeesQuery = useEmployeesQuery();
@@ -127,6 +161,7 @@ export const EmployeeManager: React.FC = () => {
 
   const openEmptyRegistrationForm = () => {
     setSelectedEmployee(null);
+    setInitialDocumentFile(null);
     setFormTitle('New Employee Registration');
     setFormReadOnly(false);
     setFormOpen(true);
@@ -164,48 +199,26 @@ export const EmployeeManager: React.FC = () => {
     setParseError(null);
 
     try {
+      const isPdf =
+        file.type === 'application/pdf' ||
+        file.type === 'application/x-pdf' ||
+        file.name.toLowerCase().endsWith('.pdf');
+      if (!isPdf) {
+        throw new Error(
+          'Only PDF documents are supported. Please select or drop a valid PDF document.'
+        );
+      }
+
       if (file.size > 10 * 1024 * 1024) {
         throw new Error(
           'File is too large. Please select a document smaller than 10MB.'
         );
       }
 
-      const base64Data = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => {
-          const result = reader.result as string;
-          const base64 = result.split(',')[1];
-          resolve(base64);
-        };
-        reader.onerror = (err) => reject(err);
-        reader.readAsDataURL(file);
-      });
-
-      const response = await fetch('/api/parse-pds', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          fileData: base64Data,
-          fileName: file.name,
-          mimeType: file.type || 'application/pdf',
-        }),
-      });
-
-      if (!response.ok) {
-        const errPayload = await response.json().catch(() => ({}));
-        throw new Error(
-          errPayload.error || 'Failed to analyze document format.'
-        );
-      }
-
-      const parsed = await response.json();
-
-      const nextId = `EMP-${String(employees.length + 1).padStart(3, '0')}`;
+      const parsed = await employeeService.extractEmployeeDocument(file);
 
       const draftedEmp: Employee = {
-        id: nextId,
+        id: '',
         surname: parsed.surname || '',
         firstName: parsed.firstName || '',
         middleName: parsed.middleName || '',
@@ -224,7 +237,8 @@ export const EmployeeManager: React.FC = () => {
         position: parsed.position || '',
         department: parsed.department || '',
         serviceDuration: parsed.serviceDuration || '',
-        employmentDate: parsed.employmentDate || '',
+        employmentDate:
+          parsed.employmentDate || new Date().toISOString().slice(0, 10),
         bachelorsDegree: parsed.bachelorsDegree || '',
         mastersStatus: parsed.mastersStatus || 'Ongoing',
         doctorateStatus: parsed.doctorateStatus || 'Ongoing',
@@ -254,6 +268,17 @@ export const EmployeeManager: React.FC = () => {
         updatedAt: Date.now(),
       };
 
+      setInitialDocumentFile({
+        file,
+        documentType: parsed.documentType || 'PDS',
+      });
+
+      storageService.addLog(
+        currentUser?.username || 'Staff',
+        'AI Document Extracted',
+        `Imported employee profile draft from "${file.name}" (${parsed.documentType}) via AI extraction.`
+      );
+
       setSelectedEmployee(draftedEmp);
       setFormTitle('New Employee Registration (AI-Imported Draft)');
       setFormReadOnly(false);
@@ -262,30 +287,68 @@ export const EmployeeManager: React.FC = () => {
     } catch (err: unknown) {
       console.error(err);
       const message =
-        err instanceof Error
+        err instanceof ApiRequestError
           ? err.message
-          : 'Could not parse this document. Please check the file and try again.';
+          : err instanceof Error
+            ? err.message
+            : 'Could not parse this document. Please check the file and try again.';
       setParseError(message);
+
+      storageService.addLog(
+        currentUser?.username || 'Staff',
+        'AI Document Extraction Failed',
+        `Failed to extract profile from "${file.name}": ${message}`
+      );
     } finally {
       setParseLoading(false);
+      if (fileInputRefForPds.current) {
+        fileInputRefForPds.current.value = '';
+      }
     }
   };
 
-  const handleFormSuccess = () => {
+  const handleFormSuccess = (info?: {
+    employeeNumber: string;
+    name: string;
+    isNew: boolean;
+  }) => {
     setFormOpen(false);
     setSelectedEmployee(null);
+    setInitialDocumentFile(null);
     setFormTitle(undefined);
     setFormReadOnly(false);
+
+    if (info) {
+      if (info.isNew) {
+        showToast({
+          type: 'success',
+          title: 'Employee Registered',
+          message: `${info.name} (${info.employeeNumber}) has been added to the directory.`,
+        });
+      } else {
+        showToast({
+          type: 'success',
+          title: 'Profile Updated',
+          message: `Saved profile updates for ${info.name} (${info.employeeNumber}).`,
+        });
+      }
+    }
   };
 
-  const handleDelete = async (emp: Employee) => {
-    const confirmed = window.confirm(
-      `Remove ${emp.surname}, ${emp.firstName} (${emp.id}) and all their records? This cannot be undone.`
-    );
-    if (!confirmed) return;
+  const handleConfirmDelete = async () => {
+    if (!employeeToDelete) return;
+
+    const empId = employeeToDelete.id;
+    const empName = `${employeeToDelete.surname}, ${employeeToDelete.firstName}`;
 
     try {
-      await deleteEmployee.mutateAsync(emp.id);
+      await deleteEmployee.mutateAsync(empId);
+      setEmployeeToDelete(null);
+      showToast({
+        type: 'success',
+        title: 'Employee Record Removed',
+        message: `${empName} (${empId}) was removed from the directory.`,
+      });
     } catch (error) {
       const message =
         error instanceof ApiRequestError
@@ -293,7 +356,11 @@ export const EmployeeManager: React.FC = () => {
           : error instanceof Error
             ? error.message
             : 'Failed to delete employee.';
-      window.alert(message);
+      showToast({
+        type: 'error',
+        title: 'Deletion Failed',
+        message,
+      });
     }
   };
 
@@ -319,12 +386,14 @@ export const EmployeeManager: React.FC = () => {
             onCancel={() => {
               setFormOpen(false);
               setSelectedEmployee(null);
+              setInitialDocumentFile(null);
               setFormTitle(undefined);
               setFormReadOnly(false);
             }}
             onSuccess={handleFormSuccess}
             title={formTitle}
             isReadOnly={formReadOnly}
+            initialDocumentFile={initialDocumentFile}
           />
         )}
       </AnimatePresence>
@@ -692,7 +761,7 @@ export const EmployeeManager: React.FC = () => {
                                 <Printer size={14} />
                               </button>
                               <button
-                                onClick={() => void handleDelete(emp)}
+                                onClick={() => setEmployeeToDelete(emp)}
                                 disabled={deleteEmployee.isPending}
                                 className="p-1.5 text-rose-500 hover:text-rose-800 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                                 title="Delete record"
@@ -916,173 +985,348 @@ export const EmployeeManager: React.FC = () => {
                 className="absolute inset-0 bg-black/60 backdrop-blur-md"
               />
 
-            {/* Modal Card */}
-            <motion.div
-              initial={{ opacity: 0, scale: 0.96, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.96, y: 20 }}
-              transition={{ type: 'spring', duration: 0.4 }}
-              className="relative w-full max-w-2xl bg-white rounded-2xl shadow-xl overflow-hidden border border-stone-200/80 flex flex-col max-h-[90vh]"
-            >
-              {/* Modal Header */}
-              <div className="px-6 py-4 border-b border-stone-100 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-green-100 rounded-xl text-green-900">
-                    <Upload size={18} />
-                  </div>
-                  <div>
-                    <h3
-                      id="addModeModalTitle"
-                      className="text-sm font-bold text-green-950"
-                    >
-                      Choose Registration Method
-                    </h3>
-                    <p className="text-[11px] text-stone-500 mt-0.5">
-                      NMC Human Resource Registry
-                    </p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (!parseLoading) setAddModeModalOpen(false);
-                  }}
-                  disabled={parseLoading}
-                  className="p-1.5 text-stone-400 hover:text-stone-700 hover:bg-stone-100 rounded-lg transition-colors disabled:opacity-30"
-                  aria-label="Close dialog"
-                >
-                  <X size={18} />
-                </button>
-              </div>
-
-              <div className="p-6 space-y-5 overflow-y-auto">
-                {/* Error State */}
-                {parseError && (
-                  <div
-                    role="alert"
-                    className="flex items-start gap-3 p-4 bg-red-50 rounded-xl border border-red-100 text-red-800 text-xs"
-                  >
-                    <AlertCircle
-                      size={16}
-                      className="shrink-0 text-red-600 mt-0.5"
-                    />
-                    <div>
-                      <span className="font-bold">
-                        Document parsing failed:{' '}
-                      </span>
-                      {parseError}
+              {/* Modal Card */}
+              <motion.div
+                initial={{ opacity: 0, scale: 0.96, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.96, y: 20 }}
+                transition={{ type: 'spring', duration: 0.4 }}
+                className="relative w-full max-w-2xl bg-white rounded-2xl shadow-xl overflow-hidden border border-stone-200/80 flex flex-col max-h-[90vh]"
+              >
+                {/* Modal Header */}
+                <div className="px-6 py-4 border-b border-stone-100 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-green-100 rounded-xl text-green-900">
+                      <Upload size={18} />
                     </div>
-                  </div>
-                )}
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Option A: Import PDS */}
-                  <div
-                    onDragOver={handleDragOver}
-                    onDragLeave={handleDragLeave}
-                    onDrop={handleDrop}
-                    className={`border rounded-2xl p-5 transition-all duration-200 flex flex-col justify-between gap-5 ${
-                      isDragging
-                        ? 'border-amber-400 bg-amber-50/40 scale-[1.01]'
-                        : 'border-stone-200/80 hover:border-emerald-300 bg-stone-50/30 hover:bg-emerald-50/20'
-                    }`}
-                  >
                     <div>
-                      <div className="flex justify-between items-start mb-4">
-                        <div className="h-10 w-10 rounded-xl bg-green-100 flex items-center justify-center text-green-800">
-                          <Fingerprint size={22} />
-                        </div>
-                        <span className="px-2 py-0.5 bg-amber-400 text-green-950 text-[9px] font-bold uppercase rounded-full tracking-wider">
-                          PDS Document
-                        </span>
-                      </div>
-                      <h4 className="font-bold text-green-950 text-sm">
-                        Import from PDS
-                      </h4>
-                      <p className="text-[11px] text-stone-500 font-medium leading-relaxed mt-2">
-                        Upload a Personal Data Sheet (CS Form 212), résumé, or
-                        bio-data. Fields are automatically extracted into the
-                        registration form.
+                      <h3
+                        id="addModeModalTitle"
+                        className="text-sm font-bold text-green-950"
+                      >
+                        Choose Registration Method
+                      </h3>
+                      <p className="text-[11px] text-stone-500 mt-0.5">
+                        NMC Human Resource Registry
                       </p>
                     </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!parseLoading) setAddModeModalOpen(false);
+                    }}
+                    disabled={parseLoading}
+                    className="p-1.5 text-stone-400 hover:text-stone-700 hover:bg-stone-100 rounded-lg transition-colors disabled:opacity-30"
+                    aria-label="Close dialog"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
 
-                    <div>
-                      <input
-                        type="file"
-                        ref={fileInputRefForPds}
-                        onChange={handleFileSelectAndParse}
-                        accept="image/*,application/pdf"
-                        className="hidden"
-                        disabled={parseLoading}
+                <div className="p-6 space-y-5 overflow-y-auto">
+                  {/* Error State */}
+                  {parseError && (
+                    <div
+                      role="alert"
+                      className="flex items-start gap-3 p-4 bg-red-50 rounded-xl border border-red-100 text-red-800 text-xs"
+                    >
+                      <AlertCircle
+                        size={16}
+                        className="shrink-0 text-red-600 mt-0.5"
                       />
-
-                      {parseLoading ? (
-                        <div className="w-full flex flex-col items-center justify-center p-4 bg-white rounded-xl border border-dashed border-stone-200">
-                          <Loader2
-                            size={22}
-                            className="text-green-900 animate-spin"
-                          />
-                          <p className="text-[10px] font-semibold text-stone-600 mt-2 text-center">
-                            Reading document and extracting fields…
-                          </p>
-                        </div>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => fileInputRefForPds.current?.click()}
-                          className="w-full inline-flex items-center justify-center gap-2 py-2.5 px-4 bg-green-900 hover:bg-green-800 text-amber-300 font-bold rounded-xl text-xs uppercase tracking-wider transition-colors cursor-pointer shadow-xs"
-                        >
-                          <Upload size={14} />
-                          Upload PDS Document
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Option B: Manual Entry */}
-                  <div className="border border-stone-200/80 hover:border-stone-300 rounded-2xl p-5 bg-white hover:bg-stone-50/50 transition-all duration-200 flex flex-col justify-between gap-5">
-                    <div>
-                      <div className="flex justify-between items-start mb-4">
-                        <div className="h-10 w-10 rounded-xl bg-stone-100 flex items-center justify-center text-stone-600">
-                          <Edit2 size={18} />
-                        </div>
-                        <span className="px-2 py-0.5 bg-stone-100 text-stone-500 text-[9px] font-bold uppercase rounded-full tracking-wider">
-                          Manual
+                      <div>
+                        <span className="font-bold">
+                          Document parsing failed:{' '}
                         </span>
+                        {parseError}
                       </div>
-                      <h4 className="font-bold text-green-950 text-sm">
-                        Enter Manually
-                      </h4>
-                      <p className="text-[11px] text-stone-500 font-medium leading-relaxed mt-2">
-                        Fill out the standard employee registration form line by
-                        line. Best for physical records or when you prefer full
-                        control.
-                      </p>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Option A: Import PDS */}
+                    <div
+                      onDragOver={handleDragOver}
+                      onDragLeave={handleDragLeave}
+                      onDrop={handleDrop}
+                      className={`border rounded-2xl p-5 transition-all duration-200 flex flex-col justify-between gap-5 ${
+                        isDragging
+                          ? 'border-amber-400 bg-amber-50/40 scale-[1.01]'
+                          : 'border-stone-200/80 hover:border-emerald-300 bg-stone-50/30 hover:bg-emerald-50/20'
+                      }`}
+                    >
+                      <div>
+                        <div className="flex justify-between items-start mb-4">
+                          <div className="h-10 w-10 rounded-xl bg-green-100 flex items-center justify-center text-green-800">
+                            <Fingerprint size={22} />
+                          </div>
+                          <span className="px-2 py-0.5 bg-amber-400 text-green-950 text-[9px] font-bold uppercase rounded-full tracking-wider">
+                            PDF Document
+                          </span>
+                        </div>
+                        <h4 className="font-bold text-green-950 text-sm">
+                          Upload Document (AI)
+                        </h4>
+                        <p className="text-[11px] text-stone-500 font-medium leading-relaxed mt-2">
+                          Upload a Personal Data Sheet (CS Form 212), résumé, or
+                          bio-data (PDF only). The AI will validate the document
+                          and pre-fill the employee registration form
+                          automatically.
+                        </p>
+                      </div>
+
+                      <div>
+                        <input
+                          type="file"
+                          ref={fileInputRefForPds}
+                          onChange={handleFileSelectAndParse}
+                          accept="application/pdf"
+                          className="hidden"
+                          disabled={parseLoading}
+                        />
+
+                        {parseLoading ? (
+                          <div className="w-full flex flex-col items-center justify-center p-4 bg-white rounded-xl border border-dashed border-stone-200">
+                            <Loader2
+                              size={22}
+                              className="text-green-900 animate-spin"
+                            />
+                            <p className="text-[10px] font-semibold text-stone-600 mt-2 text-center">
+                              Analyzing PDF &amp; extracting employee profile…
+                            </p>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => fileInputRefForPds.current?.click()}
+                            className="w-full inline-flex items-center justify-center gap-2 py-2.5 px-4 bg-green-900 hover:bg-green-800 text-amber-300 font-bold rounded-xl text-xs uppercase tracking-wider transition-colors cursor-pointer shadow-xs"
+                          >
+                            <Upload size={14} />
+                            Upload PDF Document
+                          </button>
+                        )}
+                      </div>
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={openEmptyRegistrationForm}
-                      disabled={parseLoading}
-                      className="w-full inline-flex items-center justify-center gap-2 py-2.5 px-4 bg-white border border-stone-200 hover:border-stone-300 text-green-950 font-bold rounded-xl text-xs uppercase tracking-wider shadow-xs hover:shadow transition-all cursor-pointer disabled:opacity-50"
-                    >
-                      Start Empty Form
-                      <ArrowRight size={14} className="text-green-800" />
-                    </button>
+                    {/* Option B: Manual Entry */}
+                    <div className="border border-stone-200/80 hover:border-stone-300 rounded-2xl p-5 bg-white hover:bg-stone-50/50 transition-all duration-200 flex flex-col justify-between gap-5">
+                      <div>
+                        <div className="flex justify-between items-start mb-4">
+                          <div className="h-10 w-10 rounded-xl bg-stone-100 flex items-center justify-center text-stone-600">
+                            <Edit2 size={18} />
+                          </div>
+                          <span className="px-2 py-0.5 bg-stone-100 text-stone-500 text-[9px] font-bold uppercase rounded-full tracking-wider">
+                            Manual
+                          </span>
+                        </div>
+                        <h4 className="font-bold text-green-950 text-sm">
+                          Enter Manually
+                        </h4>
+                        <p className="text-[11px] text-stone-500 font-medium leading-relaxed mt-2">
+                          Fill out the standard employee registration form line
+                          by line. Best for physical records or when you prefer
+                          full control.
+                        </p>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={openEmptyRegistrationForm}
+                        disabled={parseLoading}
+                        className="w-full inline-flex items-center justify-center gap-2 py-2.5 px-4 bg-white border border-stone-200 hover:border-stone-300 text-green-950 font-bold rounded-xl text-xs uppercase tracking-wider shadow-xs hover:shadow transition-all cursor-pointer disabled:opacity-50"
+                      >
+                        Start Empty Form
+                        <ArrowRight size={14} className="text-green-800" />
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
-
-              {/* Modal Footer */}
-              <div className="px-6 py-3.5 bg-stone-50 border-t border-stone-100 text-center">
-                <p className="text-[10px] font-medium text-stone-400 uppercase tracking-wider">
-                  Secure Document Extraction · Powered by Gemini
-                </p>
-              </div>
-            </motion.div>
+              </motion.div>
             </div>
           )}
         </AnimatePresence>,
+        document.body
+      )}
+
+      {/* ===================================================================== */}
+      {/* DELETE EMPLOYEE CONFIRMATION MODAL                                    */}
+      {/* ===================================================================== */}
+      {createPortal(
+        <AnimatePresence>
+          {employeeToDelete && (
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="deleteEmployeeModalTitle"
+              className="fixed inset-0 z-50 flex items-center justify-center p-4 !m-0"
+            >
+              {/* Backdrop */}
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() =>
+                  !deleteEmployee.isPending && setEmployeeToDelete(null)
+                }
+                className="absolute inset-0 bg-black/60 backdrop-blur-xs"
+              />
+
+              {/* Modal Card */}
+              <motion.div
+                initial={{ scale: 0.95, opacity: 0, y: 12 }}
+                animate={{ scale: 1, opacity: 1, y: 0 }}
+                exit={{ scale: 0.95, opacity: 0, y: 12 }}
+                transition={{ type: 'spring', duration: 0.3 }}
+                onClick={(e) => e.stopPropagation()}
+                className="relative z-10 w-full max-w-md bg-white rounded-3xl border border-stone-200/90 shadow-2xl p-6 space-y-5"
+              >
+                <div className="flex items-start gap-4">
+                  <div className="p-3 bg-rose-50 text-rose-600 rounded-2xl border border-rose-200/60 shrink-0">
+                    <AlertTriangle size={24} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3
+                      id="deleteEmployeeModalTitle"
+                      className="font-bold text-base text-stone-900"
+                    >
+                      Remove Employee Record?
+                    </h3>
+                    <p className="text-xs text-stone-500 mt-0.5">
+                      This action is permanent and cannot be undone.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Employee Summary Card */}
+                <div className="p-4 bg-stone-50 rounded-2xl border border-stone-200/80 flex items-center gap-3">
+                  {employeeToDelete.profilePicture ? (
+                    <img
+                      src={employeeToDelete.profilePicture}
+                      alt=""
+                      className="w-12 h-12 rounded-xl object-cover shadow-xs shrink-0"
+                    />
+                  ) : (
+                    <div className="w-12 h-12 rounded-xl bg-green-100 border border-green-200 flex items-center justify-center font-bold text-green-900 text-sm shrink-0">
+                      {employeeToDelete.firstName[0]}
+                      {employeeToDelete.surname[0]}
+                    </div>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <p className="font-bold text-sm text-green-950 truncate">
+                      {employeeToDelete.surname}, {employeeToDelete.firstName}
+                    </p>
+                    <p className="text-xs text-stone-500 truncate mt-0.5">
+                      {employeeToDelete.id} · {employeeToDelete.department} ·{' '}
+                      {employeeToDelete.position}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Warning Notice */}
+                <div className="p-3.5 bg-rose-50/70 border border-rose-200/60 rounded-xl text-xs text-rose-900 leading-relaxed">
+                  <span className="font-bold">Permanent removal: </span>
+                  This will delete the employee profile, associated checklist
+                  documents, and permanently revoke login access to the portal.
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex items-center justify-end gap-2.5 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setEmployeeToDelete(null)}
+                    disabled={deleteEmployee.isPending}
+                    className="px-4 py-2 text-xs font-semibold text-stone-700 bg-white border border-stone-300 hover:bg-stone-50 rounded-xl transition-colors cursor-pointer disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleConfirmDelete()}
+                    disabled={deleteEmployee.isPending}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-rose-700 hover:bg-rose-800 rounded-xl transition-colors shadow-xs cursor-pointer disabled:opacity-60"
+                  >
+                    {deleteEmployee.isPending ? (
+                      <>
+                        <Loader2 size={13} className="animate-spin" />
+                        <span>Deleting…</span>
+                      </>
+                    ) : (
+                      <>
+                        <Trash2 size={13} />
+                        <span>Delete Record</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
+
+      {/* ===================================================================== */}
+      {/* FLOATING TOAST NOTIFICATIONS                                          */}
+      {/* ===================================================================== */}
+      {createPortal(
+        <div
+          aria-live="polite"
+          className="fixed bottom-6 right-6 z-50 flex flex-col gap-2.5 max-w-sm w-full pointer-events-none px-4 sm:px-0"
+        >
+          <AnimatePresence>
+            {toasts.map((toast) => (
+              <motion.div
+                key={toast.id}
+                initial={{ opacity: 0, y: 16, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                transition={{ duration: 0.18 }}
+                className={`pointer-events-auto flex items-start gap-3 p-4 rounded-2xl shadow-xl border backdrop-blur-md ${
+                  toast.type === 'success'
+                    ? 'bg-emerald-950/95 text-white border-emerald-800/80 shadow-emerald-950/20'
+                    : toast.type === 'error'
+                      ? 'bg-rose-950/95 text-white border-rose-800/80 shadow-rose-950/20'
+                      : 'bg-stone-900/95 text-white border-stone-800/80 shadow-stone-950/20'
+                }`}
+              >
+                <div
+                  className={`p-1.5 rounded-xl shrink-0 mt-0.5 ${
+                    toast.type === 'success'
+                      ? 'bg-emerald-500/20 text-emerald-300'
+                      : toast.type === 'error'
+                        ? 'bg-rose-500/20 text-rose-300'
+                        : 'bg-stone-500/20 text-stone-300'
+                  }`}
+                >
+                  {toast.type === 'success' ? (
+                    <CheckCircle2 size={18} />
+                  ) : toast.type === 'error' ? (
+                    <AlertCircle size={18} />
+                  ) : (
+                    <Info size={18} />
+                  )}
+                </div>
+                <div className="flex-1 min-w-0 pr-1">
+                  <h4 className="text-xs font-bold leading-tight">
+                    {toast.title}
+                  </h4>
+                  <p className="text-[11px] text-stone-300 font-normal mt-0.5 leading-snug">
+                    {toast.message}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => removeToast(toast.id)}
+                  className="p-1 text-stone-400 hover:text-white rounded-lg hover:bg-white/10 transition-colors shrink-0 cursor-pointer"
+                  aria-label="Dismiss notification"
+                >
+                  <X size={14} />
+                </button>
+              </motion.div>
+            ))}
+          </AnimatePresence>
+        </div>,
         document.body
       )}
     </div>
