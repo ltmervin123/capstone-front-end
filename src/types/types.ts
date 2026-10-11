@@ -32,6 +32,7 @@ export interface User {
   createdAt: number;
   permissions?: UserPermissions;
   employeeId?: string;
+  profilePicture?: string;
 }
 
 export interface Employee {

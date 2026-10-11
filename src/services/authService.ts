@@ -12,6 +12,7 @@ interface AuthUserResponse {
   isApproved: boolean;
   permissions: UserPermissions | null;
   employeeId: string | null;
+  profilePicture?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -31,6 +32,7 @@ function mapAuthUserToUser(authUser: AuthUserResponse): User {
     createdAt: new Date(authUser.createdAt).getTime(),
     permissions: authUser.permissions ?? undefined,
     employeeId: authUser.employeeId ?? undefined,
+    profilePicture: authUser.profilePicture || undefined,
   };
 }
 
