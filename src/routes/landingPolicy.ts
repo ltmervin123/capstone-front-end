@@ -10,14 +10,14 @@ export function canAccessRoute(user: User | null, routeItem: RouteItem): boolean
   // Administrators bypass permission checks
   if (user.role === Role.ADMIN) return true;
 
-  // Check role constraints
+  // Check role constraints (e.g. /administration is ADMIN only)
   if (routeItem.roles && !routeItem.roles.includes(user.role)) {
     return false;
   }
 
   // Check granular permission flags
-  if (routeItem.permissionKey && user.permissions) {
-    if (user.permissions[routeItem.permissionKey] === false) {
+  if (routeItem.permissionKey) {
+    if (!user.permissions || user.permissions[routeItem.permissionKey] !== true) {
       return false;
     }
   }
@@ -31,23 +31,17 @@ export function canAccessRoute(user: User | null, routeItem: RouteItem): boolean
 export function getDefaultRouteForUser(user: User | null): string {
   if (!user) return '/login';
 
-  if (user.role === Role.EMPLOYEE) {
-    const permissions = user.permissions;
-    if (!permissions || permissions.attendance !== false) return '/attendance';
-    if (permissions.leaves !== false) return '/leaves';
-    if (permissions.payroll !== false) return '/payroll';
-    return '/attendance';
+  // Admin always lands on the Dashboard
+  if (user.role === Role.ADMIN) return '/dashboard';
+
+  // Dynamically find the first permitted module route defined in the manifest
+  const firstPermitted = ROUTE_MANIFEST.find((item) => canAccessRoute(user, item));
+  if (firstPermitted) {
+    return firstPermitted.path;
   }
 
-  if (user.role !== Role.ADMIN && user.permissions?.dashboard === false) {
-    const permissions = user.permissions;
-    if (permissions.employees !== false) return '/employees';
-    if (permissions.attendance !== false) return '/attendance';
-    if (permissions.leaves !== false) return '/leaves';
-    return '/employees';
-  }
-
-  return '/dashboard';
+  // Fallback for users with no assigned module permissions
+  return '/access-restricted';
 }
 
 /**

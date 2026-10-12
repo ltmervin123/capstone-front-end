@@ -24,6 +24,7 @@ import { FeedbackInbox } from './features/hr/FeedbackInbox';
 import { AISearch } from './features/hr/AISearch';
 import { Reports } from './features/hr/Reports';
 import { AdminDashboard } from './features/admin/AdminDashboard';
+import { AccessLimitationNotice } from './features/common/AccessLimitationNotice';
 import { NotFoundPage } from './features/common/NotFoundPage';
 
 function RootLandingRedirect() {
@@ -179,6 +180,18 @@ export default function App() {
           <Route
             path="/promotion-report"
             element={<Navigate to="/reports/promotion" replace />}
+          />
+
+          {/* Account Access Limitation fallback */}
+          <Route
+            path="/access-restricted"
+            element={
+              <AccessLimitationNotice
+                title="Account Access Notice"
+                message="Your account currently has no active module permissions assigned. Please contact an Administrator to configure your portal access."
+                showSignOut
+              />
+            }
           />
 
           {/* Catch-all 404 inside layout */}

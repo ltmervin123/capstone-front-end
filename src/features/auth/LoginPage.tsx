@@ -19,6 +19,8 @@ import { Logo } from '../../assets/common/Logo';
 import { useLogin } from '../../hooks/useAuth';
 import { loginSchema } from './login.schema';
 import { ApiRequestError } from '../../utils/apiClient';
+import { ROUTE_MANIFEST } from '../../routes/manifest';
+import { canAccessRoute, getDefaultRouteForUser } from '../../routes/landingPolicy';
 
 interface LoginPageProps {
   onLoginSuccess?: () => void;
@@ -68,13 +70,27 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
     }
 
     try {
-      await loginMutation.mutateAsync(parsed.data);
+      const authenticatedUser = await loginMutation.mutateAsync(parsed.data);
       if (onLoginSuccess) {
         onLoginSuccess();
       }
+
       const state = location.state as { from?: { pathname?: string } } | null;
-      const fromPath = state?.from?.pathname || '/';
-      navigate(fromPath, { replace: true });
+      const fromPath = state?.from?.pathname;
+
+      let destination = getDefaultRouteForUser(authenticatedUser);
+
+      if (fromPath && fromPath !== '/' && fromPath !== '/login') {
+        const matchingRoute = ROUTE_MANIFEST.find(
+          (item) => item.path === fromPath || fromPath.startsWith(`${item.path}/`)
+        );
+
+        if (matchingRoute && canAccessRoute(authenticatedUser, matchingRoute)) {
+          destination = fromPath;
+        }
+      }
+
+      navigate(destination, { replace: true });
     } catch (err) {
       if (err instanceof ApiRequestError) {
         setError(err.message);
