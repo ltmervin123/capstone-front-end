@@ -37,6 +37,7 @@ export function useLogin() {
   return useMutation({
     mutationFn: (credentials: LoginFormValues) => authService.login(credentials),
     onSuccess: (user: User) => {
+      queryClient.clear();
       setUser(user);
       queryClient.setQueryData(AUTH_SESSION_QUERY_KEY, user);
     },
@@ -51,11 +52,11 @@ export function useLogout() {
     mutationFn: () => authService.logout(),
     onSettled: () => {
       clearAuth();
-      queryClient.setQueryData(AUTH_SESSION_QUERY_KEY, null);
-      queryClient.removeQueries({ queryKey: AUTH_SESSION_QUERY_KEY });
+      queryClient.clear();
     },
   });
 }
+
 
 export function useCurrentUser() {
   return useAuthStore((state) => state.user);

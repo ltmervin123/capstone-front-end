@@ -1,12 +1,15 @@
 import { useQuery } from '@tanstack/react-query';
 import { dashboardService } from '../services/dashboardService';
+import { useAuthStore } from '../stores/authStore';
 
-export const DASHBOARD_QUERY_KEY = ['dashboard'] as const;
+export const dashboardQueryKey = (userId?: string) => [userId ?? '', 'dashboard'] as const;
 
 export function useDashboardQuery(options?: { enabled?: boolean }) {
+  const userId = useAuthStore((state) => state.user?.id);
   return useQuery({
-    queryKey: DASHBOARD_QUERY_KEY,
+    queryKey: dashboardQueryKey(userId),
     queryFn: () => dashboardService.getSummary(),
-    enabled: options?.enabled ?? true,
+    enabled: !!userId && (options?.enabled ?? true),
   });
 }
+

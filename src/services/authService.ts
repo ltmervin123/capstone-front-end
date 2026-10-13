@@ -2,6 +2,7 @@ import type { LoginFormValues } from '../features/auth/login.schema';
 import { Role, type User, type UserPermissions } from '../types/types';
 import { apiRequest, setSessionRefresher, type ApiSuccessResponse } from '../utils/apiClient';
 import { useAuthStore } from '../stores/authStore';
+import { clearAppQueryCache } from '../lib/queryClient';
 
 interface AuthUserResponse {
   id: string;
@@ -42,6 +43,7 @@ async function fetchCurrentUser(): Promise<User> {
 }
 
 let activeRefreshPromise: Promise<User> | null = null;
+
 
 export const authService = {
   async login(credentials: LoginFormValues): Promise<User> {
@@ -101,6 +103,7 @@ export const authService = {
     }
   },
 
+
   async changePassword(payload: { currentPassword: string; newPassword: string }): Promise<void> {
     await apiRequest<ApiSuccessResponse<{ message?: string }>>('/auth/password', {
       method: 'PATCH',
@@ -115,7 +118,9 @@ setSessionRefresher(async () => {
     return true;
   } catch {
     useAuthStore.getState().clearAuth();
+    clearAppQueryCache();
     return false;
   }
 });
+
 

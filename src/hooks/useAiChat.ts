@@ -6,20 +6,23 @@ import {
   type RenameConversationPayload,
   type StreamChatPayload,
 } from '../services/aiService';
+import { useAuthStore } from '../stores/authStore';
 
-export const AI_CONVERSATIONS_QUERY_KEY = ['ai', 'conversations'] as const;
+export const aiConversationsQueryKey = (userId?: string) =>
+  [userId ?? '', 'ai', 'conversations'] as const;
 
-export const aiConversationQueryKey = (id: string | null) =>
-  ['ai', 'conversation', id] as const;
+export const aiConversationQueryKey = (userId: string | undefined, id: string | null) =>
+  [userId ?? '', 'ai', 'conversation', id] as const;
 
 /**
  * Fetch list of all saved AI conversations
  */
 export function useAiConversationsQuery(options?: { enabled?: boolean }) {
+  const userId = useAuthStore((state) => state.user?.id);
   return useQuery({
-    queryKey: AI_CONVERSATIONS_QUERY_KEY,
+    queryKey: aiConversationsQueryKey(userId),
     queryFn: () => aiService.listConversations(),
-    enabled: options?.enabled ?? true,
+    enabled: !!userId && (options?.enabled ?? true),
   });
 }
 
@@ -30,15 +33,16 @@ export function useAiConversationQuery(
   conversationId: string | null,
   options?: { enabled?: boolean }
 ) {
+  const userId = useAuthStore((state) => state.user?.id);
   return useQuery({
-    queryKey: aiConversationQueryKey(conversationId),
+    queryKey: aiConversationQueryKey(userId, conversationId),
     queryFn: () => {
       if (!conversationId) {
         throw new Error('Conversation ID is required');
       }
       return aiService.getConversation(conversationId);
     },
-    enabled: !!conversationId && (options?.enabled ?? true),
+    enabled: !!userId && !!conversationId && (options?.enabled ?? true),
   });
 }
 
@@ -47,24 +51,25 @@ export function useAiConversationQuery(
  */
 export function useRenameAiConversation() {
   const queryClient = useQueryClient();
+  const userId = useAuthStore((state) => state.user?.id);
 
   return useMutation({
     mutationFn: ({ id, title }: RenameConversationPayload) =>
       aiService.renameConversation(id, title),
     onSuccess: (updated) => {
       queryClient.setQueryData<ConversationSummary[]>(
-        AI_CONVERSATIONS_QUERY_KEY,
+        aiConversationsQueryKey(userId),
         (current) =>
           current?.map((conv) =>
             conv.id === updated.id ? { ...conv, title: updated.title } : conv
           )
       );
       queryClient.setQueryData<ConversationDetail>(
-        aiConversationQueryKey(updated.id),
+        aiConversationQueryKey(userId, updated.id),
         (current) => (current ? { ...current, title: updated.title } : current)
       );
       void queryClient.invalidateQueries({
-        queryKey: AI_CONVERSATIONS_QUERY_KEY,
+        queryKey: aiConversationsQueryKey(userId),
       });
     },
   });
@@ -75,19 +80,20 @@ export function useRenameAiConversation() {
  */
 export function useDeleteAiConversation() {
   const queryClient = useQueryClient();
+  const userId = useAuthStore((state) => state.user?.id);
 
   return useMutation({
     mutationFn: (id: string) => aiService.deleteConversation(id),
     onSuccess: (_, deletedId) => {
       queryClient.setQueryData<ConversationSummary[]>(
-        AI_CONVERSATIONS_QUERY_KEY,
+        aiConversationsQueryKey(userId),
         (current) => current?.filter((conv) => conv.id !== deletedId)
       );
       queryClient.removeQueries({
-        queryKey: aiConversationQueryKey(deletedId),
+        queryKey: aiConversationQueryKey(userId, deletedId),
       });
       void queryClient.invalidateQueries({
-        queryKey: AI_CONVERSATIONS_QUERY_KEY,
+        queryKey: aiConversationsQueryKey(userId),
       });
     },
   });
@@ -98,17 +104,18 @@ export function useDeleteAiConversation() {
  */
 export function useClearAllAiConversations() {
   const queryClient = useQueryClient();
+  const userId = useAuthStore((state) => state.user?.id);
 
   return useMutation({
     mutationFn: () => aiService.clearAllConversations(),
     onSuccess: () => {
       queryClient.setQueryData<ConversationSummary[]>(
-        AI_CONVERSATIONS_QUERY_KEY,
+        aiConversationsQueryKey(userId),
         []
       );
-      queryClient.removeQueries({ queryKey: ['ai'] });
+      queryClient.removeQueries({ queryKey: [userId ?? '', 'ai'] });
       void queryClient.invalidateQueries({
-        queryKey: AI_CONVERSATIONS_QUERY_KEY,
+        queryKey: aiConversationsQueryKey(userId),
       });
     },
   });
@@ -119,6 +126,7 @@ export function useClearAllAiConversations() {
  */
 export function useStreamAiChat() {
   const queryClient = useQueryClient();
+  const userId = useAuthStore((state) => state.user?.id);
 
   return useMutation({
     mutationFn: ({
@@ -137,8 +145,9 @@ export function useStreamAiChat() {
       ),
     onSuccess: () => {
       void queryClient.invalidateQueries({
-        queryKey: AI_CONVERSATIONS_QUERY_KEY,
+        queryKey: aiConversationsQueryKey(userId),
       });
     },
   });
 }
+

@@ -1,29 +1,35 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { adminService, type CreateStaffUserInput } from '../services/adminService';
 import type { UserPermissions } from '../types/types';
+import { useAuthStore } from '../stores/authStore';
 
-export const ADMIN_USERS_QUERY_KEY = ['admin', 'users'] as const;
-export const ADMIN_AUDIT_LOGS_QUERY_KEY = ['admin', 'audit-logs'] as const;
+export const adminUsersQueryKey = (userId?: string) => [userId ?? '', 'admin', 'users'] as const;
+export const adminAuditLogsQueryKey = (userId?: string) => [userId ?? '', 'admin', 'audit-logs'] as const;
 
 export function useAdminUsersQuery() {
+  const userId = useAuthStore((state) => state.user?.id);
   return useQuery({
-    queryKey: ADMIN_USERS_QUERY_KEY,
+    queryKey: adminUsersQueryKey(userId),
     queryFn: () => adminService.listUsers(),
+    enabled: !!userId,
   });
 }
 
 export function useAdminAuditLogsQuery() {
+  const userId = useAuthStore((state) => state.user?.id);
   return useQuery({
-    queryKey: ADMIN_AUDIT_LOGS_QUERY_KEY,
+    queryKey: adminAuditLogsQueryKey(userId),
     queryFn: () => adminService.listAuditLogs(),
+    enabled: !!userId,
   });
 }
 
 function useInvalidateAdmin() {
   const queryClient = useQueryClient();
+  const userId = useAuthStore((state) => state.user?.id);
   return () => {
-    void queryClient.invalidateQueries({ queryKey: ADMIN_USERS_QUERY_KEY });
-    void queryClient.invalidateQueries({ queryKey: ADMIN_AUDIT_LOGS_QUERY_KEY });
+    void queryClient.invalidateQueries({ queryKey: adminUsersQueryKey(userId) });
+    void queryClient.invalidateQueries({ queryKey: adminAuditLogsQueryKey(userId) });
   };
 }
 

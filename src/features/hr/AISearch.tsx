@@ -31,7 +31,7 @@ import type {
   ConversationSummary,
 } from '../../services/aiService';
 import {
-  AI_CONVERSATIONS_QUERY_KEY,
+  aiConversationsQueryKey,
   aiConversationQueryKey,
   useAiConversationsQuery,
   useAiConversationQuery,
@@ -40,7 +40,9 @@ import {
   useClearAllAiConversations,
   useStreamAiChat,
 } from '../../hooks/useAiChat';
+import { useCurrentUser } from '../../hooks/useAuth';
 import { AiChartCard } from '../../components/AiChartCard';
+
 
 interface Message {
   id: string;
@@ -61,12 +63,14 @@ function getTimestamp(): number {
 }
 
 export const AISearch: React.FC = () => {
+  const currentUser = useCurrentUser();
   // Active selection
   const [activeConversationId, setActiveConversationId] = useState<
     string | null
   >(() => {
     return localStorage.getItem(STORAGE_KEY_ACTIVE_CONV);
   });
+
 
   // React Query hooks for conversations list and active conversation
   const conversationsQuery = useAiConversationsQuery();
@@ -278,11 +282,12 @@ export const AISearch: React.FC = () => {
               setActiveConversationId(resolvedConvId);
               localStorage.setItem(STORAGE_KEY_ACTIVE_CONV, resolvedConvId);
               await queryClient.invalidateQueries({
-                queryKey: AI_CONVERSATIONS_QUERY_KEY,
+                queryKey: aiConversationsQueryKey(currentUser?.id),
               });
               await queryClient.invalidateQueries({
-                queryKey: aiConversationQueryKey(resolvedConvId),
+                queryKey: aiConversationQueryKey(currentUser?.id, resolvedConvId),
               });
+
               setStreamMessages(null);
             }
           },

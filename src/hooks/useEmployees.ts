@@ -5,19 +5,22 @@ import {
   type CreateEmployeePayload,
   type EmployeeDocumentLabel,
 } from '../services/employeeService';
+import { useAuthStore } from '../stores/authStore';
 
-export const EMPLOYEES_QUERY_KEY = ['employees'] as const;
+export const employeesQueryKey = (userId?: string) => [userId ?? '', 'employees'] as const;
 
 export function useEmployeesQuery(options?: { enabled?: boolean }) {
+  const userId = useAuthStore((state) => state.user?.id);
   return useQuery({
-    queryKey: EMPLOYEES_QUERY_KEY,
+    queryKey: employeesQueryKey(userId),
     queryFn: () => employeeService.listEmployees(),
-    enabled: options?.enabled ?? true,
+    enabled: !!userId && (options?.enabled ?? true),
   });
 }
 
 export function useCreateEmployee() {
   const queryClient = useQueryClient();
+  const userId = useAuthStore((state) => state.user?.id);
 
   return useMutation({
     mutationFn: (params: {
@@ -26,13 +29,14 @@ export function useCreateEmployee() {
       attachments?: CreateEmployeeAttachment[];
     }) => employeeService.createEmployee(params),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: EMPLOYEES_QUERY_KEY });
+      void queryClient.invalidateQueries({ queryKey: employeesQueryKey(userId) });
     },
   });
 }
 
 export function useUpdateEmployee() {
   const queryClient = useQueryClient();
+  const userId = useAuthStore((state) => state.user?.id);
 
   return useMutation({
     mutationFn: (params: {
@@ -44,18 +48,20 @@ export function useUpdateEmployee() {
       removedDocuments?: EmployeeDocumentLabel[];
     }) => employeeService.updateEmployee(params),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: EMPLOYEES_QUERY_KEY });
+      void queryClient.invalidateQueries({ queryKey: employeesQueryKey(userId) });
     },
   });
 }
 
 export function useDeleteEmployee() {
   const queryClient = useQueryClient();
+  const userId = useAuthStore((state) => state.user?.id);
 
   return useMutation({
     mutationFn: (employeeNumber: string) => employeeService.deleteEmployee(employeeNumber),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: EMPLOYEES_QUERY_KEY });
+      void queryClient.invalidateQueries({ queryKey: employeesQueryKey(userId) });
     },
   });
 }
+

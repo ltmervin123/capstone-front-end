@@ -24,6 +24,7 @@ import { FeedbackInbox } from './features/hr/FeedbackInbox';
 import { AISearch } from './features/hr/AISearch';
 import { Reports } from './features/hr/Reports';
 import { AdminDashboard } from './features/admin/AdminDashboard';
+import { Loader2 } from 'lucide-react';
 import { AccessLimitationNotice } from './features/common/AccessLimitationNotice';
 import { NotFoundPage } from './features/common/NotFoundPage';
 
@@ -31,7 +32,13 @@ function RootLandingRedirect() {
   const currentUser = useAuthStore((state) => state.user);
   const isInitialized = useAuthStore((state) => state.isInitialized);
 
-  if (!isInitialized) return null;
+  if (!isInitialized) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#fdfcf0]">
+        <Loader2 className="h-8 w-8 animate-spin text-green-900" />
+      </div>
+    );
+  }
   if (!currentUser) {
     return <Navigate to="/login" replace />;
   }
@@ -39,6 +46,7 @@ function RootLandingRedirect() {
   const destination = getDefaultRouteForUser(currentUser);
   return <Navigate to={destination} replace />;
 }
+
 
 export default function App() {
   useInitializeAuth();
