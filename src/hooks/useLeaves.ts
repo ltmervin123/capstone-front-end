@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { leaveService, type CreateLeavePayload } from '../services/leaveService';
 import { useAuthStore } from '../stores/authStore';
+import { invalidateLeaveRelated } from '../lib/queryInvalidations';
 
 export const leavesQueryKey = (userId?: string) => [userId ?? '', 'leaves'] as const;
 
@@ -20,7 +21,7 @@ export function useCreateLeave() {
   return useMutation({
     mutationFn: (payload: CreateLeavePayload) => leaveService.createLeave(payload),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: leavesQueryKey(userId) });
+      invalidateLeaveRelated(queryClient, userId);
     },
   });
 }
@@ -32,7 +33,7 @@ export function useDeleteLeave() {
   return useMutation({
     mutationFn: (id: string) => leaveService.deleteLeave(id),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: leavesQueryKey(userId) });
+      invalidateLeaveRelated(queryClient, userId);
     },
   });
 }
@@ -44,7 +45,7 @@ export function useRejectLeave() {
   return useMutation({
     mutationFn: (id: string) => leaveService.rejectLeave(id),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: leavesQueryKey(userId) });
+      invalidateLeaveRelated(queryClient, userId);
     },
   });
 }
@@ -56,7 +57,7 @@ export function useApproveLeave() {
   return useMutation({
     mutationFn: (id: string) => leaveService.approveLeave(id),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: leavesQueryKey(userId) });
+      invalidateLeaveRelated(queryClient, userId);
     },
   });
 }

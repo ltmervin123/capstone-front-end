@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { applicantService, type ApplicantPayloadInput } from '../services/applicantService';
 import { useAuthStore } from '../stores/authStore';
+import { invalidateApplicantRelated } from '../lib/queryInvalidations';
 
 export const applicantsQueryKey = (userId?: string) => [userId ?? '', 'applicants'] as const;
 
@@ -20,7 +21,7 @@ export function useCreateApplicant() {
   return useMutation({
     mutationFn: (payload: ApplicantPayloadInput) => applicantService.createApplicant(payload),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: applicantsQueryKey(userId) });
+      invalidateApplicantRelated(queryClient, userId);
     },
   });
 }
@@ -33,7 +34,7 @@ export function useUpdateApplicant() {
     mutationFn: (params: { id: string; payload: ApplicantPayloadInput }) =>
       applicantService.updateApplicant(params.id, params.payload),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: applicantsQueryKey(userId) });
+      invalidateApplicantRelated(queryClient, userId);
     },
   });
 }
@@ -45,7 +46,7 @@ export function useDeleteApplicant() {
   return useMutation({
     mutationFn: (id: string) => applicantService.deleteApplicant(id),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: applicantsQueryKey(userId) });
+      invalidateApplicantRelated(queryClient, userId);
     },
   });
 }

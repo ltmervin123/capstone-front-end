@@ -6,6 +6,7 @@ import {
   type EmployeeDocumentLabel,
 } from '../services/employeeService';
 import { useAuthStore } from '../stores/authStore';
+import { invalidateEmployeeRelated } from '../lib/queryInvalidations';
 
 export const employeesQueryKey = (userId?: string) => [userId ?? '', 'employees'] as const;
 
@@ -29,7 +30,7 @@ export function useCreateEmployee() {
       attachments?: CreateEmployeeAttachment[];
     }) => employeeService.createEmployee(params),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: employeesQueryKey(userId) });
+      invalidateEmployeeRelated(queryClient, userId);
     },
   });
 }
@@ -48,7 +49,7 @@ export function useUpdateEmployee() {
       removedDocuments?: EmployeeDocumentLabel[];
     }) => employeeService.updateEmployee(params),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: employeesQueryKey(userId) });
+      invalidateEmployeeRelated(queryClient, userId);
     },
   });
 }
@@ -60,7 +61,7 @@ export function useDeleteEmployee() {
   return useMutation({
     mutationFn: (employeeNumber: string) => employeeService.deleteEmployee(employeeNumber),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: employeesQueryKey(userId) });
+      invalidateEmployeeRelated(queryClient, userId);
     },
   });
 }

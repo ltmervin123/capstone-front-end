@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { adminService, type CreateStaffUserInput } from '../services/adminService';
 import type { UserPermissions } from '../types/types';
 import { useAuthStore } from '../stores/authStore';
+import { invalidateAdminRelated } from '../lib/queryInvalidations';
 
 export const adminUsersQueryKey = (userId?: string) => [userId ?? '', 'admin', 'users'] as const;
 export const adminAuditLogsQueryKey = (userId?: string) => [userId ?? '', 'admin', 'audit-logs'] as const;
@@ -28,8 +29,7 @@ function useInvalidateAdmin() {
   const queryClient = useQueryClient();
   const userId = useAuthStore((state) => state.user?.id);
   return () => {
-    void queryClient.invalidateQueries({ queryKey: adminUsersQueryKey(userId) });
-    void queryClient.invalidateQueries({ queryKey: adminAuditLogsQueryKey(userId) });
+    invalidateAdminRelated(queryClient, userId);
   };
 }
 

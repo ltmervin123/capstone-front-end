@@ -8,6 +8,7 @@ import {
   type AdjustPayrollRecordPayload,
   type CreatePayrollRunPayload,
 } from '../../services/payrollService';
+import { invalidatePayrollRelated } from '../../lib/queryInvalidations';
 import {
   Role,
   type PayrollRecord,
@@ -82,7 +83,7 @@ export const PayrollRecords: React.FC = () => {
     mutationFn: (payload: CreatePayrollRunPayload) =>
       payrollService.createPayrollRun(payload),
     onSuccess: (newRun) => {
-      queryClient.invalidateQueries({ queryKey: [currentUser?.id ?? '', 'payroll'] });
+      invalidatePayrollRelated(queryClient, currentUser?.id);
       setIsCreateRunOpen(false);
 
       setSelectedRunId(newRun.id);
@@ -102,7 +103,7 @@ export const PayrollRecords: React.FC = () => {
   const lockAttendanceMutation = useMutation({
     mutationFn: (runId: string) => payrollService.lockAttendance(runId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [currentUser?.id ?? '', 'payroll'] });
+      invalidatePayrollRelated(queryClient, currentUser?.id);
       setFeedbackBanner({
         type: 'success',
         message: 'Attendance locked successfully. Batch is now ready for calculation.',
@@ -119,7 +120,7 @@ export const PayrollRecords: React.FC = () => {
   const unlockAttendanceMutation = useMutation({
     mutationFn: (runId: string) => payrollService.unlockAttendance(runId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [currentUser?.id ?? '', 'payroll'] });
+      invalidatePayrollRelated(queryClient, currentUser?.id);
       setFeedbackBanner({
         type: 'success',
         message: 'Attendance unlocked. Pay run reverted to Draft.',
@@ -136,7 +137,7 @@ export const PayrollRecords: React.FC = () => {
   const calculateMutation = useMutation({
     mutationFn: (runId: string) => payrollService.calculatePayrollRun(runId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [currentUser?.id ?? '', 'payroll'] });
+      invalidatePayrollRelated(queryClient, currentUser?.id);
       setFeedbackBanner({
         type: 'success',
         message: 'Payroll calculation finished. Line items are ready for review.',
@@ -153,7 +154,7 @@ export const PayrollRecords: React.FC = () => {
   const publishMutation = useMutation({
     mutationFn: (runId: string) => payrollService.publishPayrollRun(runId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [currentUser?.id ?? '', 'payroll'] });
+      invalidatePayrollRelated(queryClient, currentUser?.id);
       setFeedbackBanner({
         type: 'success',
         message:
@@ -171,7 +172,7 @@ export const PayrollRecords: React.FC = () => {
   const deleteRunMutation = useMutation({
     mutationFn: (runId: string) => payrollService.deletePayrollRun(runId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [currentUser?.id ?? '', 'payroll'] });
+      invalidatePayrollRelated(queryClient, currentUser?.id);
       setSelectedRunId('ALL');
       setFeedbackBanner({
         type: 'success',
@@ -195,7 +196,7 @@ export const PayrollRecords: React.FC = () => {
       payload: AdjustPayrollRecordPayload;
     }) => payrollService.adjustPayrollRecord(id, payload),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [currentUser?.id ?? '', 'payroll'] });
+      invalidatePayrollRelated(queryClient, currentUser?.id);
       setAdjustingRecord(null);
       setFeedbackBanner({
         type: 'success',
