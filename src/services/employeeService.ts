@@ -1,4 +1,8 @@
-import type { Employee } from '../types/types';
+import type {
+  CreatePromotionPayload,
+  Employee,
+  EmployeePromotionRecord,
+} from '../types/types';
 import { apiRequest, type ApiSuccessResponse } from '../utils/apiClient';
 
 export type ApiEmployee = Employee & { dbId?: string };
@@ -157,6 +161,64 @@ export const employeeService = {
       {
         method: 'POST',
         body: formData,
+      }
+    );
+
+    return response.data;
+  },
+
+  async listPromotions(employeeNumber: string): Promise<EmployeePromotionRecord[]> {
+    const response = await apiRequest<ApiSuccessResponse<EmployeePromotionRecord[]>>(
+      `/employees/${encodeURIComponent(employeeNumber)}/promotions`
+    );
+    return response.data;
+  },
+
+  async promoteEmployee(params: {
+    employeeNumber: string;
+    payload: CreatePromotionPayload;
+    document?: File | null;
+  }): Promise<EmployeePromotionRecord> {
+    const formData = new FormData();
+    formData.append('payload', JSON.stringify(params.payload));
+
+    if (params.document) {
+      formData.append('document', params.document);
+    }
+
+    const response = await apiRequest<ApiSuccessResponse<EmployeePromotionRecord>>(
+      `/employees/${encodeURIComponent(params.employeeNumber)}/promotions`,
+      {
+        method: 'POST',
+        body: formData,
+      }
+    );
+
+    return response.data;
+  },
+
+  async approvePromotion(params: {
+    employeeNumber: string;
+    promotionId: string;
+  }): Promise<{ id: string; status: string }> {
+    const response = await apiRequest<ApiSuccessResponse<{ id: string; status: string }>>(
+      `/employees/${encodeURIComponent(params.employeeNumber)}/promotions/${encodeURIComponent(params.promotionId)}/approve`,
+      {
+        method: 'PATCH',
+      }
+    );
+
+    return response.data;
+  },
+
+  async deletePendingPromotion(params: {
+    employeeNumber: string;
+    promotionId: string;
+  }): Promise<{ success: boolean }> {
+    const response = await apiRequest<ApiSuccessResponse<{ success: boolean }>>(
+      `/employees/${encodeURIComponent(params.employeeNumber)}/promotions/${encodeURIComponent(params.promotionId)}`,
+      {
+        method: 'DELETE',
       }
     );
 

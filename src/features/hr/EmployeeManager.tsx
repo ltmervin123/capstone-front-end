@@ -11,11 +11,14 @@ import { AuditTrailTable } from './employee/components/AuditTrailTable';
 import { DeleteEmployeeModal } from './employee/components/DeleteEmployeeModal';
 import { EmployeeDirectoryTable } from './employee/components/EmployeeDirectoryTable';
 import { EmployeeManagerHeader } from './employee/components/EmployeeManagerHeader';
+import { PromoteEmployeeModal } from './employee/components/PromoteEmployeeModal';
 import { ToastContainer } from './employee/components/ToastContainer';
+import { storageService } from '../../services/storageService';
 import { useAuditTrail } from './employee/hooks/useAuditTrail';
 import { useDocumentImport } from './employee/hooks/useDocumentImport';
 import { useEmployeeDirectory } from './employee/hooks/useEmployeeDirectory';
 import { useToastNotifications } from './employee/hooks/useToastNotifications';
+import type { EmployeePromotionRecord } from '../../types/types';
 import type { EmployeeTabType, InitialDocumentFile } from './employee/types';
 
 export const EmployeeManager: React.FC = () => {
@@ -24,6 +27,9 @@ export const EmployeeManager: React.FC = () => {
 
   const [formOpen, setFormOpen] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(
+    null
+  );
+  const [promotingEmployee, setPromotingEmployee] = useState<Employee | null>(
     null
   );
   const [initialDocumentFile, setInitialDocumentFile] =
@@ -149,6 +155,34 @@ export const EmployeeManager: React.FC = () => {
     }
   };
 
+  const handlePromotionSuccess = (promo: EmployeePromotionRecord) => {
+    setPromotingEmployee(null);
+    const actionDesc = promo.isApproved
+      ? 'Promoted employee'
+      : 'Submitted promotion recommendation';
+    const empName = promo.fullName || promo.employeeNumber;
+    const detailDesc = `${promo.employeeNumber} — ${empName} to ${promo.newPosition}`;
+    storageService.addLog(
+      currentUser?.username ?? 'System',
+      actionDesc,
+      detailDesc
+    );
+
+    if (promo.isApproved) {
+      showToast({
+        type: 'success',
+        title: 'Employee Promoted',
+        message: `${empName} (${promo.employeeNumber}) was promoted to ${promo.newPosition}.`,
+      });
+    } else {
+      showToast({
+        type: 'success',
+        title: 'Promotion Submitted',
+        message: `Promotion recommendation for ${empName} was submitted for review.`,
+      });
+    }
+  };
+
   const handleConfirmDelete = async () => {
     if (!employeeToDelete) return;
 
@@ -205,6 +239,10 @@ export const EmployeeManager: React.FC = () => {
             title={formTitle}
             isReadOnly={formReadOnly}
             initialDocumentFile={initialDocumentFile}
+            onPromote={(emp) => {
+              setFormOpen(false);
+              setPromotingEmployee(emp);
+            }}
           />
         )}
       </AnimatePresence>
@@ -312,6 +350,7 @@ export const EmployeeManager: React.FC = () => {
             onFilterStatusChange={setFilterStatus}
             onView={handleViewOnly}
             onEdit={handleEdit}
+            onPromote={(emp) => setPromotingEmployee(emp)}
             onDelete={(emp) => setEmployeeToDelete(emp)}
             isDeleting={deleteEmployee.isPending}
             deletingEmployeeId={
@@ -333,6 +372,14 @@ export const EmployeeManager: React.FC = () => {
           />
         )}
       </section>
+
+      {/* Promote Employee Modal */}
+      <PromoteEmployeeModal
+        employee={promotingEmployee}
+        isOpen={Boolean(promotingEmployee)}
+        onClose={() => setPromotingEmployee(null)}
+        onSuccess={handlePromotionSuccess}
+      />
 
       {/* Choice Modal (AI vs. Manual) */}
       <AddEmployeeChoiceModal

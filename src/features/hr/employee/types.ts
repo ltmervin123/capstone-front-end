@@ -56,6 +56,7 @@ export interface EmployeeFormProps {
   title?: string;
   isReadOnly?: boolean;
   initialDocumentFile?: InitialDocumentFile | null;
+  onPromote?: (emp: Employee) => void;
 }
 
 export interface ToastMessage {

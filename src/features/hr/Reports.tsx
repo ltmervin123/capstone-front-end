@@ -16,6 +16,7 @@ import {
   Users,
   ChevronDown,
   Loader2,
+  Trash2,
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import {
@@ -40,6 +41,13 @@ import {
   useAttendanceReportQuery,
   useReportFiltersQuery,
 } from '../../hooks/useReports';
+import { useCurrentUser } from '../../hooks/useAuth';
+import { Role } from '../../types/types';
+import {
+  useApprovePromotionMutation,
+  useDeletePromotionMutation,
+} from '../../hooks/useEmployees';
+import { storageService } from '../../services/storageService';
 import { exportToCsv } from '../../utils/exportUtils';
 import type {
   EmploymentReportRecord,
@@ -204,6 +212,57 @@ export const Reports: React.FC<ReportsProps> = ({ initialType }) => {
     });
     return `${datePart} at ${timePart}`;
   }, []);
+
+  const currentUser = useCurrentUser();
+  const isAdmin = currentUser?.role === Role.ADMIN;
+  const approvePromotionMutation = useApprovePromotionMutation();
+  const deletePromotionMutation = useDeletePromotionMutation();
+  const [promotionToast, setPromotionToast] = useState<string | null>(null);
+
+  const handleApprovePromotion = async (
+    employeeNumber: string,
+    promotionId: string,
+    positionTitle: string
+  ) => {
+    try {
+      await approvePromotionMutation.mutateAsync({ employeeNumber, promotionId });
+      storageService.addLog(
+        currentUser?.username ?? 'Admin',
+        'Approved employee promotion',
+        `${employeeNumber} — promotion to ${positionTitle} approved from promotion report.`
+      );
+      setPromotionToast(`Approved promotion for ${employeeNumber} (${positionTitle}).`);
+      setTimeout(() => setPromotionToast(null), 4000);
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'Failed to approve promotion');
+    }
+  };
+
+  const handleDeletePromotion = async (
+    employeeNumber: string,
+    promotionId: string,
+    positionTitle: string
+  ) => {
+    if (
+      !window.confirm(
+        `Are you sure you want to discard this pending promotion recommendation for ${positionTitle}?`
+      )
+    ) {
+      return;
+    }
+    try {
+      await deletePromotionMutation.mutateAsync({ employeeNumber, promotionId });
+      storageService.addLog(
+        currentUser?.username ?? 'Admin',
+        'Discarded promotion recommendation',
+        `${employeeNumber} — promotion recommendation for ${positionTitle} discarded from report.`
+      );
+      setPromotionToast(`Discarded promotion recommendation for ${employeeNumber}.`);
+      setTimeout(() => setPromotionToast(null), 4000);
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'Failed to discard promotion');
+    }
+  };
 
   // CSV Export Handlers
   const handleExportCsv = () => {
@@ -1051,6 +1110,22 @@ export const Reports: React.FC<ReportsProps> = ({ initialType }) => {
         aria-label="Detailed report records"
         className="bg-white rounded-2xl border border-stone-200/80 shadow-xs overflow-hidden flex flex-col"
       >
+        {promotionToast && (
+          <div className="mx-5 mt-4 p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold rounded-xl flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 size={15} />
+              <span>{promotionToast}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setPromotionToast(null)}
+              className="text-stone-400 hover:text-stone-700 cursor-pointer text-sm"
+            >
+              ×
+            </button>
+          </div>
+        )}
+
         {/* Table Top Header Bar */}
         <div className="p-5 bg-stone-50/80 border-b border-stone-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
@@ -1262,15 +1337,68 @@ export const Reports: React.FC<ReportsProps> = ({ initialType }) => {
                       </span>
                     </td>
                     <td className="px-6 py-4 text-right">
-                      <span
-                        className={`inline-block px-2.5 py-0.5 rounded-md font-bold text-xs ${
-                          promo.promotionStatus.includes('Approved')
-                            ? 'bg-emerald-50 text-emerald-800'
-                            : 'bg-amber-50 text-amber-900'
-                        }`}
-                      >
-                        {promo.promotionStatus}
-                      </span>
+                      <div className="flex flex-col items-end gap-1.5">
+                        <span
+                          className={`inline-block px-2.5 py-0.5 rounded-md font-bold text-xs ${
+                            promo.promotionStatus.includes('Approved')
+                              ? 'bg-emerald-50 text-emerald-800'
+                              : 'bg-amber-50 text-amber-900'
+                          }`}
+                        >
+                          {promo.promotionStatus}
+                        </span>
+
+                        {!promo.promotionStatus.includes('Approved') && isAdmin && (
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleApprovePromotion(
+                                  promo.employeeNumber,
+                                  promo.id,
+                                  promo.promotedPosition
+                                )
+                              }
+                              disabled={
+                                approvePromotionMutation.isPending ||
+                                deletePromotionMutation.isPending
+                              }
+                              className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-colors cursor-pointer disabled:opacity-50"
+                              title="Approve this promotion"
+                            >
+                              {approvePromotionMutation.isPending ? (
+                                <Loader2 size={11} className="animate-spin" />
+                              ) : (
+                                <CheckCircle2 size={11} />
+                              )}
+                              <span>Approve</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleDeletePromotion(
+                                  promo.employeeNumber,
+                                  promo.id,
+                                  promo.promotedPosition
+                                )
+                              }
+                              disabled={
+                                approvePromotionMutation.isPending ||
+                                deletePromotionMutation.isPending
+                              }
+                              className="inline-flex items-center gap-1 px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-xs font-semibold transition-colors cursor-pointer disabled:opacity-50"
+                              title="Discard pending recommendation"
+                            >
+                              {deletePromotionMutation.isPending ? (
+                                <Loader2 size={11} className="animate-spin" />
+                              ) : (
+                                <Trash2 size={11} />
+                              )}
+                              <span>Discard</span>
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}

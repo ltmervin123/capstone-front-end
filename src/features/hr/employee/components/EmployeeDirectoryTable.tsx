@@ -7,6 +7,7 @@ import {
   Printer,
   Search,
   Trash2,
+  TrendingUp,
   X,
 } from 'lucide-react';
 import { DEPARTMENTS, type Employee } from '../../../../types/types';
@@ -22,6 +23,7 @@ interface EmployeeDirectoryTableProps {
   onFilterStatusChange: (value: string) => void;
   onView: (emp: Employee) => void;
   onEdit: (emp: Employee) => void;
+  onPromote?: (emp: Employee) => void;
   onDelete: (emp: Employee) => void;
   isDeleting: boolean;
   deletingEmployeeId?: string | null;
@@ -38,6 +40,7 @@ export const EmployeeDirectoryTable: React.FC<EmployeeDirectoryTableProps> = ({
   onFilterStatusChange,
   onView,
   onEdit,
+  onPromote,
   onDelete,
   isDeleting,
   deletingEmployeeId,
@@ -266,6 +269,16 @@ export const EmployeeDirectoryTable: React.FC<EmployeeDirectoryTableProps> = ({
                           <Edit2 size={13} />
                           <span className="hidden lg:inline">Edit</span>
                         </button>
+                        {onPromote && (
+                          <button
+                            onClick={() => onPromote(emp)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold cursor-pointer bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200/60 transition-colors"
+                            title="Promote employee"
+                          >
+                            <TrendingUp size={13} />
+                            <span className="hidden xl:inline">Promote</span>
+                          </button>
+                        )}
                         <button
                           className="p-1.5 text-stone-500 hover:text-stone-800 hover:bg-stone-100 rounded-lg transition-colors cursor-pointer"
                           title="Print record"

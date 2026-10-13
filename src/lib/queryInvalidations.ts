@@ -14,6 +14,7 @@ export const domainKeys = {
   payroll: (userId?: string) => [userId ?? '', 'payroll'] as const,
   adminUsers: (userId?: string) => [userId ?? '', 'admin', 'users'] as const,
   adminAuditLogs: (userId?: string) => [userId ?? '', 'admin', 'audit-logs'] as const,
+  promotions: (employeeNumber: string, userId?: string) => [userId ?? '', 'employees', employeeNumber, 'promotions'] as const,
 };
 
 /**
@@ -27,6 +28,27 @@ export function invalidateEmployeeRelated(queryClient: QueryClient, userId?: str
   void queryClient.invalidateQueries({ queryKey: domainKeys.dashboard(userId) });
   void queryClient.invalidateQueries({ queryKey: domainKeys.reports(userId) });
   void queryClient.invalidateQueries({ queryKey: domainKeys.adminAuditLogs(userId) });
+}
+
+/**
+ * Invalidates promotion queries, employee records, reports, dashboard, and audit logs.
+ */
+export function invalidatePromotionRelated(
+  queryClient: QueryClient,
+  userId?: string,
+  employeeNumber?: string
+): void {
+  invalidateEmployeeRelated(queryClient, userId);
+  if (employeeNumber) {
+    void queryClient.invalidateQueries({
+      queryKey: domainKeys.promotions(employeeNumber, userId),
+    });
+  } else {
+    void queryClient.invalidateQueries({
+      predicate: (query) =>
+        Array.isArray(query.queryKey) && query.queryKey.includes('promotions'),
+    });
+  }
 }
 
 /**

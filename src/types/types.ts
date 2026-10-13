@@ -269,3 +269,31 @@ export const DEPARTMENTS = [
   'Admission and Testing',
   'DPO'
 ];
+
+export interface EmployeePromotionRecord {
+  id: string;
+  employeeId: string;
+  employeeNumber: string;
+  fullName: string;
+  previousPosition: string;
+  newPosition: string;
+  previousDepartment?: string;
+  newDepartment?: string;
+  effectiveDate: string;
+  remarks: string;
+  isApproved: boolean;
+  status: 'Approved & Scheduled' | 'Recommended & Pending';
+  approvedBy?: string | null;
+  createdBy?: string | null;
+  createdAt: string;
+}
+
+export interface CreatePromotionPayload {
+  newPosition: string;
+  newDepartmentName?: string;
+  newDepartmentId?: string;
+  effectiveDate: string;
+  newFunctionalRate?: number;
+  remarks: string;
+  isApproved?: boolean;
+}

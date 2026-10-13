@@ -5,8 +5,13 @@ import {
   type CreateEmployeePayload,
   type EmployeeDocumentLabel,
 } from '../services/employeeService';
+import type { CreatePromotionPayload } from '../types/types';
 import { useAuthStore } from '../stores/authStore';
-import { invalidateEmployeeRelated } from '../lib/queryInvalidations';
+import {
+  domainKeys,
+  invalidateEmployeeRelated,
+  invalidatePromotionRelated,
+} from '../lib/queryInvalidations';
 
 export const employeesQueryKey = (userId?: string) => [userId ?? '', 'employees'] as const;
 
@@ -62,6 +67,60 @@ export function useDeleteEmployee() {
     mutationFn: (employeeNumber: string) => employeeService.deleteEmployee(employeeNumber),
     onSuccess: () => {
       invalidateEmployeeRelated(queryClient, userId);
+    },
+  });
+}
+
+export function useEmployeePromotionsQuery(
+  employeeNumber?: string,
+  options?: { enabled?: boolean }
+) {
+  const userId = useAuthStore((state) => state.user?.id);
+  return useQuery({
+    queryKey: domainKeys.promotions(employeeNumber ?? '', userId),
+    queryFn: () => employeeService.listPromotions(employeeNumber!),
+    enabled: !!userId && !!employeeNumber && (options?.enabled ?? true),
+  });
+}
+
+export function usePromoteEmployeeMutation() {
+  const queryClient = useQueryClient();
+  const userId = useAuthStore((state) => state.user?.id);
+
+  return useMutation({
+    mutationFn: (params: {
+      employeeNumber: string;
+      payload: CreatePromotionPayload;
+      document?: File | null;
+    }) => employeeService.promoteEmployee(params),
+    onSuccess: (_data, variables) => {
+      invalidatePromotionRelated(queryClient, userId, variables.employeeNumber);
+    },
+  });
+}
+
+export function useApprovePromotionMutation() {
+  const queryClient = useQueryClient();
+  const userId = useAuthStore((state) => state.user?.id);
+
+  return useMutation({
+    mutationFn: (params: { employeeNumber: string; promotionId: string }) =>
+      employeeService.approvePromotion(params),
+    onSuccess: (_data, variables) => {
+      invalidatePromotionRelated(queryClient, userId, variables.employeeNumber);
+    },
+  });
+}
+
+export function useDeletePromotionMutation() {
+  const queryClient = useQueryClient();
+  const userId = useAuthStore((state) => state.user?.id);
+
+  return useMutation({
+    mutationFn: (params: { employeeNumber: string; promotionId: string }) =>
+      employeeService.deletePendingPromotion(params),
+    onSuccess: (_data, variables) => {
+      invalidatePromotionRelated(queryClient, userId, variables.employeeNumber);
     },
   });
 }

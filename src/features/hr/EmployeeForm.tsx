@@ -1,6 +1,6 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
-import { Eye, Loader2, RotateCcw, Save, User, X } from 'lucide-react';
+import { Eye, Loader2, RotateCcw, Save, TrendingUp, User, X } from 'lucide-react';
 import { AiExtractionBanner } from './employee/components/AiExtractionBanner';
 import { AllAttachmentsModal } from './employee/components/AllAttachmentsModal';
 import { AttachmentViewerModal } from './employee/components/AttachmentViewerModal';
@@ -11,6 +11,7 @@ import { EmploymentDetailsSection } from './employee/components/EmploymentDetail
 import { Form201ChecklistSection } from './employee/components/Form201ChecklistSection';
 import { FormErrorBanner } from './employee/components/FormErrorBanner';
 import { PersonalIdentificationSection } from './employee/components/PersonalIdentificationSection';
+import { PromotionHistorySection } from './employee/components/PromotionHistorySection';
 import { RegistrationSuccessModal } from './employee/components/RegistrationSuccessModal';
 import { ResetConfirmModal } from './employee/components/ResetConfirmModal';
 import { useEmployeeForm } from './employee/hooks/useEmployeeForm';
@@ -26,6 +27,7 @@ export const EmployeeForm: React.FC<EmployeeFormProps> = ({
   title,
   isReadOnly = false,
   initialDocumentFile = null,
+  onPromote,
 }) => {
   const {
     formData,
@@ -146,14 +148,27 @@ export const EmployeeForm: React.FC<EmployeeFormProps> = ({
                   </p>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={onCancel}
-                className="p-1.5 text-stone-400 hover:text-stone-700 hover:bg-stone-100 rounded-lg transition-colors cursor-pointer"
-                aria-label="Close dialog"
-              >
-                <X size={18} />
-              </button>
+              <div className="flex items-center gap-2">
+                {employee && onPromote && (
+                  <button
+                    type="button"
+                    onClick={() => onPromote(employee)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200/80 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+                    title="Promote this employee"
+                  >
+                    <TrendingUp size={13} />
+                    <span className="hidden sm:inline">Promote Employee</span>
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={onCancel}
+                  className="p-1.5 text-stone-400 hover:text-stone-700 hover:bg-stone-100 rounded-lg transition-colors cursor-pointer"
+                  aria-label="Close dialog"
+                >
+                  <X size={18} />
+                </button>
+              </div>
             </div>
 
             {/* Scrollable Form Body */}
@@ -209,6 +224,14 @@ export const EmployeeForm: React.FC<EmployeeFormProps> = ({
                   isReadOnly={isReadOnly}
                   updateField={updateField}
                 />
+
+                {employee && (
+                  <PromotionHistorySection
+                    employeeNumber={employee.id}
+                    employeeName={`${employee.firstName} ${employee.surname}`}
+                    onPromote={onPromote ? () => onPromote(employee) : undefined}
+                  />
+                )}
 
                 <CompensationSection
                   formData={formData}
