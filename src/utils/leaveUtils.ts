@@ -1,6 +1,6 @@
 import { LeaveType, type LeaveRecord } from '../types/types';
 
-export const TOTAL_LEAVE_LIMIT = 15;
+export const TOTAL_LEAVE_LIMIT = 7;
 
 export function leaveDays(leave: LeaveRecord): number {
   if (leave.numberOfDays > 0) return leave.numberOfDays;

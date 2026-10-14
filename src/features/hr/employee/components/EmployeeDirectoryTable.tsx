@@ -45,8 +45,25 @@ export const EmployeeDirectoryTable: React.FC<EmployeeDirectoryTableProps> = ({
   isDeleting,
   deletingEmployeeId,
 }) => {
+  const [employeeToPrint, setEmployeeToPrint] = React.useState<Employee | null>(
+    null,
+  );
+
+  React.useEffect(() => {
+    if (!employeeToPrint) return;
+
+    const handleAfterPrint = () => setEmployeeToPrint(null);
+    window.addEventListener('afterprint', handleAfterPrint);
+    window.print();
+
+    return () => window.removeEventListener('afterprint', handleAfterPrint);
+  }, [employeeToPrint]);
+
+  const printValue = (value: string | undefined) => value?.trim() || '—';
+
   return (
-    <div className="space-y-6">
+    <>
+      <div className="space-y-6">
       {/* Search & Filter Bar */}
       <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-stone-200/80 shadow-xs flex flex-col sm:flex-row gap-3">
         <div className="flex-1 relative">
@@ -280,8 +297,11 @@ export const EmployeeDirectoryTable: React.FC<EmployeeDirectoryTableProps> = ({
                           </button>
                         )}
                         <button
+                          type="button"
+                          onClick={() => setEmployeeToPrint(emp)}
                           className="p-1.5 text-stone-500 hover:text-stone-800 hover:bg-stone-100 rounded-lg transition-colors cursor-pointer"
                           title="Print record"
+                          aria-label={`Print record for ${emp.firstName} ${emp.surname}`}
                         >
                           <Printer size={14} />
                         </button>
@@ -323,5 +343,129 @@ export const EmployeeDirectoryTable: React.FC<EmployeeDirectoryTableProps> = ({
         </div>
       </div>
     </div>
+    {employeeToPrint && (
+      <article className="employee-print-root">
+        <header className="employee-print-header">
+          <p className="employee-print-organization">
+            Northern Mindanao Colleges, Inc.
+          </p>
+          <p className="employee-print-address">
+            A.D. Curato St., Cabadbaran City, Agusan del Norte
+          </p>
+          <h1>Employee Record</h1>
+        </header>
+
+        <section className="employee-print-section">
+          <h2>Personal Information</h2>
+          <dl className="employee-print-grid">
+            <div>
+              <dt>Full Name</dt>
+              <dd>
+                {[
+                  employeeToPrint.firstName,
+                  employeeToPrint.middleName,
+                  employeeToPrint.surname,
+                ]
+                  .filter(Boolean)
+                  .join(' ')}
+              </dd>
+            </div>
+            <div>
+              <dt>Employee ID</dt>
+              <dd>{printValue(employeeToPrint.id)}</dd>
+            </div>
+            <div>
+              <dt>Date of Birth</dt>
+              <dd>{printValue(employeeToPrint.dateOfBirth)}</dd>
+            </div>
+            <div>
+              <dt>Sex</dt>
+              <dd>{printValue(employeeToPrint.sex)}</dd>
+            </div>
+            <div>
+              <dt>Marital Status</dt>
+              <dd>{printValue(employeeToPrint.maritalStatus)}</dd>
+            </div>
+            <div>
+              <dt>Religion</dt>
+              <dd>{printValue(employeeToPrint.religion)}</dd>
+            </div>
+            <div>
+              <dt>Contact Number</dt>
+              <dd>{printValue(employeeToPrint.contactNumber)}</dd>
+            </div>
+            <div>
+              <dt>Email</dt>
+              <dd>{printValue(employeeToPrint.email)}</dd>
+            </div>
+            <div className="employee-print-full-width">
+              <dt>Home Address</dt>
+              <dd>{printValue(employeeToPrint.homeAddress)}</dd>
+            </div>
+          </dl>
+        </section>
+
+        <section className="employee-print-section">
+          <h2>Employment Information</h2>
+          <dl className="employee-print-grid">
+            <div>
+              <dt>Position</dt>
+              <dd>{printValue(employeeToPrint.position)}</dd>
+            </div>
+            <div>
+              <dt>Department</dt>
+              <dd>{printValue(employeeToPrint.department)}</dd>
+            </div>
+            <div>
+              <dt>Status</dt>
+              <dd>{printValue(employeeToPrint.status)}</dd>
+            </div>
+            <div>
+              <dt>Employment Date</dt>
+              <dd>{printValue(employeeToPrint.employmentDate)}</dd>
+            </div>
+            <div>
+              <dt>Years of Service</dt>
+              <dd>{printValue(employeeToPrint.serviceDuration)}</dd>
+            </div>
+            <div>
+              <dt>Promotion Year</dt>
+              <dd>{printValue(employeeToPrint.promotionYear)}</dd>
+            </div>
+          </dl>
+        </section>
+
+        <section className="employee-print-section">
+          <h2>Educational Information</h2>
+          <dl className="employee-print-grid">
+            <div>
+              <dt>Education Level</dt>
+              <dd>{printValue(employeeToPrint.educationLevel)}</dd>
+            </div>
+            <div>
+              <dt>Bachelor’s Degree</dt>
+              <dd>{printValue(employeeToPrint.bachelorsDegree)}</dd>
+            </div>
+            <div>
+              <dt>Master’s Status</dt>
+              <dd>{printValue(employeeToPrint.mastersStatus)}</dd>
+            </div>
+            <div>
+              <dt>Master’s Degree</dt>
+              <dd>{printValue(employeeToPrint.mastersDegreeName)}</dd>
+            </div>
+            <div>
+              <dt>Doctorate Status</dt>
+              <dd>{printValue(employeeToPrint.doctorateStatus)}</dd>
+            </div>
+          </dl>
+        </section>
+
+        <footer className="employee-print-footer">
+          Printed on {new Date().toLocaleDateString()}
+        </footer>
+      </article>
+    )}
+    </>
   );
 };

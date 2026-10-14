@@ -24,7 +24,105 @@
 }
 
 /* Print Styles */
+.employee-print-root {
+  display: none;
+}
+
 @media print {
+  @page {
+    margin: 14mm;
+  }
+
+  body * {
+    visibility: hidden !important;
+  }
+
+  .employee-print-root,
+  .employee-print-root * {
+    visibility: visible !important;
+  }
+
+  .employee-print-root {
+    display: block !important;
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    color: #111827;
+    font-family: Arial, sans-serif;
+    font-size: 10pt;
+  }
+
+  .employee-print-header {
+    text-align: center;
+    padding-bottom: 14pt;
+    border-bottom: 1px solid #9ca3af;
+  }
+
+  .employee-print-organization {
+    margin: 0;
+    font-size: 15pt;
+    font-weight: 700;
+  }
+
+  .employee-print-address {
+    margin: 3pt 0 12pt;
+    color: #4b5563;
+    font-size: 9pt;
+  }
+
+  .employee-print-header h1 {
+    margin: 0;
+    font-size: 18pt;
+  }
+
+  .employee-print-section {
+    margin-top: 16pt;
+    break-inside: avoid;
+  }
+
+  .employee-print-section h2 {
+    margin: 0 0 8pt;
+    padding-bottom: 4pt;
+    border-bottom: 1px solid #d1d5db;
+    color: #14532d;
+    font-size: 11pt;
+    text-transform: uppercase;
+  }
+
+  .employee-print-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 9pt 18pt;
+    margin: 0;
+  }
+
+  .employee-print-grid > div {
+    min-width: 0;
+  }
+
+  .employee-print-grid dt {
+    color: #6b7280;
+    font-size: 8pt;
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+
+  .employee-print-grid dd {
+    margin: 2pt 0 0;
+    overflow-wrap: anywhere;
+  }
+
+  .employee-print-full-width {
+    grid-column: 1 / -1;
+  }
+
+  .employee-print-footer {
+    margin-top: 24pt;
+    color: #6b7280;
+    font-size: 8pt;
+    text-align: right;
+  }
+
   .no-print { display: none !important; }
   aside { display: none !important; }
   main { padding: 0 !important; }
@@ -101,4 +199,3 @@
   padding: 0.125rem 0.25rem;
   border-radius: 0.25rem;
 }
-
