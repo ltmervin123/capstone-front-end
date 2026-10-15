@@ -15,7 +15,6 @@ import { useCurrentUser } from '../hooks/useAuth.ts';
 import { useLeavesQuery } from '../hooks/useLeaves.ts';
 import { ApiRequestError } from '../utils/apiClient.ts';
 import { Logo } from '../assets/common/Logo.tsx';
-import { LeaveType } from '../types/types.ts';
 import {
   TOTAL_LEAVE_LIMIT,
   leaveDays,
@@ -52,16 +51,15 @@ export const EmployeeLeaveSection: React.FC = () => {
 
   // Current year credit calculations
   const currentYear = new Date().getFullYear();
-  const formCreditLeaves = myLeaves.filter((leave) => {
-    if (leave.type !== LeaveType.LEAVE_CREDITS) return false;
-    return leave.startDate.slice(0, 4) === String(currentYear);
-  });
-  const formApprovedCreditDays = formCreditLeaves
-    .filter((leave) => leave.status === 'Approved')
+  const currentYearLeaves = myLeaves.filter(
+    (leave) => leave.startDate.slice(0, 4) === String(currentYear)
+  );
+  const reservedLeaveDays = currentYearLeaves
+    .filter((leave) => leave.status !== 'Rejected')
     .reduce((sum, leave) => sum + leaveDays(leave), 0);
-  const remainingLeaveCredits = Math.max(
+  const remainingLeaveBalance = Math.max(
     0,
-    TOTAL_LEAVE_LIMIT - formApprovedCreditDays
+    TOTAL_LEAVE_LIMIT - reservedLeaveDays
   );
 
   const approvedLeaves = myLeaves.filter((l) => l.status === 'Approved');
@@ -74,6 +72,12 @@ export const EmployeeLeaveSection: React.FC = () => {
     (sum, leave) => sum + leaveDays(leave),
     0
   );
+  const currentYearApprovedDays = currentYearLeaves
+    .filter((leave) => leave.status === 'Approved')
+    .reduce((sum, leave) => sum + leaveDays(leave), 0);
+  const currentYearPendingDays = currentYearLeaves
+    .filter((leave) => leave.status === 'Pending')
+    .reduce((sum, leave) => sum + leaveDays(leave), 0);
 
   const ownLeave = myLeaves.find(
     (leave) => leave.employeeId === currentUser?.employeeId
@@ -126,7 +130,7 @@ export const EmployeeLeaveSection: React.FC = () => {
       id: 'remaining',
       label: 'Remaining Balance',
       subtitle: 'Available to request',
-      value: `${remainingLeaveCredits}.0`,
+      value: `${remainingLeaveBalance}.0`,
       unit: 'Days',
       icon: CalendarClock,
       iconBg: 'bg-purple-50 text-purple-800',
@@ -135,11 +139,11 @@ export const EmployeeLeaveSection: React.FC = () => {
 
   const usedPercentage = Math.min(
     100,
-    Math.round((totalApprovedDays / TOTAL_LEAVE_LIMIT) * 100)
+    Math.round((currentYearApprovedDays / TOTAL_LEAVE_LIMIT) * 100)
   );
   const pendingPercentage = Math.min(
     100 - usedPercentage,
-    Math.round((totalPendingDays / TOTAL_LEAVE_LIMIT) * 100)
+    Math.round((currentYearPendingDays / TOTAL_LEAVE_LIMIT) * 100)
   );
 
   return (
@@ -224,12 +228,12 @@ export const EmployeeLeaveSection: React.FC = () => {
         ))}
       </section>
 
-      {/* Leave Credits Progress Card */}
+      {/* Annual Leave Allocation Progress Card */}
       <div className="bg-white rounded-2xl border border-stone-200/80 p-5 shadow-xs space-y-3">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div>
             <h3 className="text-sm font-bold text-green-950">
-              Annual Leave Credits Usage
+              Annual Leave Allocation Usage
             </h3>
             <p className="text-xs text-stone-500 font-medium">
               Maximum allocation of {TOTAL_LEAVE_LIMIT}.0 days per calendar year
@@ -237,7 +241,7 @@ export const EmployeeLeaveSection: React.FC = () => {
           </div>
           <div className="text-xs font-bold text-stone-700 tabular-nums">
             <span className="text-emerald-800">
-              {remainingLeaveCredits}.0 Days
+              {remainingLeaveBalance}.0 Days
             </span>{' '}
             Remaining
           </div>
@@ -247,12 +251,12 @@ export const EmployeeLeaveSection: React.FC = () => {
           <div
             style={{ width: `${usedPercentage}%` }}
             className="bg-emerald-600 h-full transition-all duration-500"
-            title={`Used: ${totalApprovedDays} days (${usedPercentage}%)`}
+            title={`Used: ${currentYearApprovedDays} days (${usedPercentage}%)`}
           />
           <div
             style={{ width: `${pendingPercentage}%` }}
             className="bg-amber-400 h-full transition-all duration-500"
-            title={`Pending: ${totalPendingDays} days (${pendingPercentage}%)`}
+            title={`Pending: ${currentYearPendingDays} days (${pendingPercentage}%)`}
           />
         </div>
 
@@ -260,11 +264,11 @@ export const EmployeeLeaveSection: React.FC = () => {
           <div className="flex items-center gap-4">
             <span className="flex items-center gap-1.5 font-medium">
               <span className="w-2.5 h-2.5 rounded-full bg-emerald-600 shrink-0" />
-              Approved ({totalApprovedDays}.0d)
+              Approved ({currentYearApprovedDays}.0d)
             </span>
             <span className="flex items-center gap-1.5 font-medium">
               <span className="w-2.5 h-2.5 rounded-full bg-amber-400 shrink-0" />
-              Pending ({totalPendingDays}.0d)
+              Pending ({currentYearPendingDays}.0d)
             </span>
           </div>
           <span className="text-stone-500 font-medium">
@@ -461,7 +465,7 @@ export const EmployeeLeaveSection: React.FC = () => {
       <LeaveApplicationModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        remainingCredits={remainingLeaveCredits}
+        remainingDays={remainingLeaveBalance}
         employeeName={empName}
         employeeDepartment={empDept}
         employeeNumber={currentUser?.employeeId ?? ''}

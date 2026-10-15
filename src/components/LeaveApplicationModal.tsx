@@ -14,7 +14,7 @@ import { ApiRequestError } from '../utils/apiClient';
 interface LeaveApplicationModalProps {
   isOpen: boolean;
   onClose: () => void;
-  remainingCredits: number;
+  remainingDays: number;
   employeeName: string;
   employeeDepartment: string;
   employeeNumber: string;
@@ -23,7 +23,7 @@ interface LeaveApplicationModalProps {
 export const LeaveApplicationModal: React.FC<LeaveApplicationModalProps> = ({
   isOpen,
   onClose,
-  remainingCredits,
+  remainingDays,
   employeeName,
   employeeDepartment,
   employeeNumber,
@@ -95,12 +95,9 @@ export const LeaveApplicationModal: React.FC<LeaveApplicationModalProps> = ({
       return;
     }
 
-    if (
-      parsed.data.type === LeaveType.LEAVE_CREDITS &&
-      parsed.data.numberOfDays > remainingCredits
-    ) {
+    if (parsed.data.numberOfDays > remainingDays) {
       setFormError(
-        `Leave Limit Exceeded: You are requesting ${parsed.data.numberOfDays} day(s), but only have ${remainingCredits} leave credit(s) remaining for this calendar year.`
+        `Leave Limit Exceeded: You are requesting ${parsed.data.numberOfDays} day(s), but only have ${remainingDays} day(s) remaining in your annual leave allocation.`
       );
       return;
     }
@@ -186,7 +183,7 @@ export const LeaveApplicationModal: React.FC<LeaveApplicationModalProps> = ({
                     </div>
                     <div>
                       <p className="text-xs font-bold text-emerald-950">
-                        Annual Leave Credits
+                        Annual Leave Allocation
                       </p>
                       <p className="text-[11px] text-emerald-800 font-medium">
                         Standard annual entitlement
@@ -195,7 +192,7 @@ export const LeaveApplicationModal: React.FC<LeaveApplicationModalProps> = ({
                   </div>
                   <div className="text-right">
                     <span className="text-xs font-mono font-bold text-emerald-950 bg-white px-3 py-1 rounded-lg border border-emerald-200 shadow-2xs tabular-nums inline-block">
-                      {remainingCredits}.0 Days Left
+                      {remainingDays}.0 Days Left
                     </span>
                   </div>
                 </div>
